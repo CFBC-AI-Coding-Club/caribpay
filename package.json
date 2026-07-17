@@ -1,0 +1,19 @@
+{
+  "name": "caribpay",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "bun run --cwd apps/api dev",
+    "dev:mobile": "echo \"apps/mobile is scaffolded in Phase 6\"",
+    "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd apps/api typecheck",
+    "test": "bun test",
+    "db:generate": "bun run --cwd apps/api db:generate",
+    "db:migrate": "bun run --cwd apps/api db:migrate",
+    "db:seed": "bun run --cwd apps/api db:seed",
+    "reconcile": "bun run --cwd apps/api reconcile"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.7.0"
+  }
+}
