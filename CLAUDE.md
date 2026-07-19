@@ -67,7 +67,9 @@ caribpay/
 
 ## Local environment note
 
-Docker on this machine runs inside WSL2 Ubuntu (no Docker Desktop). The PowerShell `docker` command is a shim that forwards to WSL; published ports are reachable from Windows at `localhost`.
+Docker on this machine runs inside WSL2 Ubuntu (no Docker Desktop). The PowerShell `docker` command is a shim that forwards to WSL; published ports are reachable from Windows at `localhost`. The redis container maps to host port 6380 here (native WSL redis owns 6379) — see the root `.env`.
+
+**Run `bun test` through WSL on this machine** (`wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin/bun test"`): Bun for Windows (≤1.3.14) segfaults in bun:test under postgres connection churn. Plain `bun` scripts (dev server, migrate, seed) are fine on Windows. Linux/macOS teammates and CI are unaffected.
 
 ---
 

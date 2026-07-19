@@ -20,8 +20,9 @@ services:
     image: redis:7
     restart: unless-stopped
     command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    # Host port is overridable (REDIS_PORT in a root .env) for machines where 6379 is taken.
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
