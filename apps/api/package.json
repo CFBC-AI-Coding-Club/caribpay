@@ -14,7 +14,8 @@
   "dependencies": {
     "@caribpay/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10"
