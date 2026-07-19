@@ -1,10 +1,11 @@
-import { Hono } from "hono";
+import { buildApp } from "./app";
+import { env } from "./env";
 
-const app = new Hono();
+const app = buildApp();
 
-app.get("/api/v1/health", (c) => c.json({ status: "ok" }));
+console.log(`caribpay-api listening on :${env.port}`);
 
 export default {
-  port: Number(process.env.PORT ?? 3000),
+  port: env.port,
   fetch: app.fetch,
 };

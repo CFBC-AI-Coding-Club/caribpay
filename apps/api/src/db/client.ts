@@ -13,3 +13,8 @@ export const db: BunSQLDatabase<typeof schema> = drizzle({ client: sqlClient, sc
 
 /** Accepts either the root db or a transaction handle, so services compose into atomic units. */
 export type DbHandle = PgDatabase<BunSQLQueryResultHKT, typeof schema>;
+
+/** For tests and graceful shutdown; the pool otherwise keeps the process alive. */
+export async function closeDb(): Promise<void> {
+  await sqlClient.close();
+}
