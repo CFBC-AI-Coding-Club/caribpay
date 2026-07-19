@@ -50,3 +50,5 @@ export function homeCurrencyFor(countryCode: string): Currency {
 }
 
 export const WALLET_ADDRESS_PATTERN = /^CW(-[A-Z0-9]{4}){4}$/;
+
+export const FX_QUOTE_TTL_SECONDS = 60;

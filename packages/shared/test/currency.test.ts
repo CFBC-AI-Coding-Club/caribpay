@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatMoney, fromMinor, toMinor } from "../src/currency";
+import { applyRate, formatMoney, fromMinor, toMinor } from "../src/currency";
 
 describe("toMinor", () => {
   test("parses decimal strings exactly", () => {
@@ -65,6 +65,35 @@ describe("fromMinor", () => {
   test("rejects non-integer input", () => {
     expect(() => fromMinor(10.5, "USD")).toThrow(RangeError);
     expect(() => fromMinor(Number.NaN, "USD")).toThrow(RangeError);
+  });
+});
+
+describe("applyRate", () => {
+  test("multiplies exactly with half-up rounding", () => {
+    expect(applyRate(150000, "58.51851852")).toBe(8777778);
+    expect(applyRate(100000, "0.01708861")).toBe(1709);
+    expect(applyRate(100, "0.01708861")).toBe(2);
+    expect(applyRate(99, "0.005")).toBe(0);
+    expect(applyRate(100, "0.005")).toBe(1);
+  });
+
+  test("integer rates are exact", () => {
+    expect(applyRate(12345, "2")).toBe(24690);
+    expect(applyRate(0, "58.51851852")).toBe(0);
+  });
+
+  test("handles large JMD-scale amounts without precision loss", () => {
+    // 2_500_000_000_000 * 0.01708861 = 42721525000.0 exactly
+    expect(applyRate(2_500_000_000_000, "0.01708861")).toBe(42_721_525_000);
+  });
+
+  test("rejects invalid input", () => {
+    expect(() => applyRate(-1, "2")).toThrow(RangeError);
+    expect(() => applyRate(10.5, "2")).toThrow(RangeError);
+    expect(() => applyRate(100, "-2")).toThrow(RangeError);
+    expect(() => applyRate(100, "abc")).toThrow(RangeError);
+    expect(() => applyRate(100, "0")).toThrow(RangeError);
+    expect(() => applyRate(Number.MAX_SAFE_INTEGER, "1000000")).toThrow(RangeError);
   });
 });
 

@@ -50,6 +50,34 @@ export function fromMinor(amountMinor: number, currency: Currency): string {
   return `${sign}${whole}.${frac}`;
 }
 
+const RATE_PATTERN = /^(\d+)(?:\.(\d+))?$/;
+
+/**
+ * Apply an FX rate (positive decimal string, e.g. "58.51851852") to an amount
+ * in minor units, rounding half-up. Pure integer/BigInt math — no floats.
+ */
+export function applyRate(amountMinor: number, rate: string): number {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0) {
+    throw new RangeError(`Amount must be a non-negative safe integer: ${amountMinor}`);
+  }
+  const match = RATE_PATTERN.exec(rate);
+  if (!match) {
+    throw new RangeError(`Invalid rate: "${rate}"`);
+  }
+  const fracDigits = match[2] ?? "";
+  const mantissa = BigInt((match[1] ?? "0") + fracDigits);
+  if (mantissa === 0n) {
+    throw new RangeError(`Rate must be positive: "${rate}"`);
+  }
+  const scale = 10n ** BigInt(fracDigits.length);
+  const result = (BigInt(amountMinor) * mantissa + scale / 2n) / scale;
+  const asNumber = Number(result);
+  if (!Number.isSafeInteger(asNumber)) {
+    throw new RangeError(`Converted amount out of safe integer range`);
+  }
+  return asNumber;
+}
+
 /** Format minor units for display, e.g. formatMoney(150050, "XCD") -> "XCD 1,500.50". */
 export function formatMoney(
   amountMinor: number,
