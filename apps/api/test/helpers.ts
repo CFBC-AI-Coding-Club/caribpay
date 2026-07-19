@@ -1,7 +1,10 @@
 import { SQL } from "bun";
+import { and, eq } from "drizzle-orm";
 import { drizzle, type BunSQLDatabase } from "drizzle-orm/bun-sql";
+import type { Currency } from "@caribpay/shared";
 import * as schema from "../src/db/schema";
 import { runMigrations } from "../src/db/migrate";
+import { postLedgerEntries } from "../src/services/ledger";
 
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? "postgresql://caribpay:caribpay@localhost:5432/caribpay_test";
@@ -41,6 +44,52 @@ export async function truncateAll(client: SQL): Promise<void> {
              ledger_entries, wallet_balances, fx_rates, idempotency_records
     RESTART IDENTITY CASCADE
   `;
+}
+
+/** Credit a wallet via an honest deposit posting against settlement_clearing. */
+export async function fundWalletForTest(
+  db: BunSQLDatabase<typeof schema>,
+  walletId: string,
+  currency: Currency,
+  amountMinor: number,
+): Promise<string> {
+  const [sysAccount] = await db
+    .select({ id: schema.systemAccounts.id })
+    .from(schema.systemAccounts)
+    .where(
+      and(
+        eq(schema.systemAccounts.type, "settlement_clearing"),
+        eq(schema.systemAccounts.currency, currency),
+      ),
+    );
+  if (sysAccount === undefined) {
+    throw new Error(`System accounts not seeded (missing settlement_clearing:${currency})`);
+  }
+  const [txRow] = await db
+    .insert(schema.transactions)
+    .values({
+      type: "deposit",
+      status: "settled",
+      idempotencyKey: crypto.randomUUID(),
+      sourceCurrency: currency,
+      destCurrency: currency,
+      sourceAmountMinor: amountMinor,
+      destAmountMinor: amountMinor,
+    })
+    .returning({ id: schema.transactions.id });
+  await db.transaction(async (tx) => {
+    await postLedgerEntries(tx, txRow!.id, [
+      {
+        accountType: "system",
+        systemAccountId: sysAccount.id,
+        direction: "debit",
+        amountMinor,
+        currency,
+      },
+      { accountType: "user_wallet", walletId, direction: "credit", amountMinor, currency },
+    ]);
+  });
+  return txRow!.id;
 }
 
 export function testWalletAddress(): string {

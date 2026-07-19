@@ -16,23 +16,18 @@ setDefaultTimeout(30000);
 
 let t: TestDb;
 let app: Hono<AppEnv>;
-let closeDb: () => Promise<void>;
 
 beforeAll(async () => {
   t = await setupTestDb();
   // The app's global db client must bind to the test database; set the env
-  // before the app module graph is imported.
+  // before the app module graph is imported. The global pool is closed once
+  // for the whole run by test/global-teardown.ts.
   process.env.DATABASE_URL = TEST_DATABASE_URL;
-  const [{ buildApp }, clientModule] = await Promise.all([
-    import("../src/app"),
-    import("../src/db/client"),
-  ]);
-  closeDb = clientModule.closeDb;
+  const { buildApp } = await import("../src/app");
   app = buildApp();
 });
 
 afterAll(async () => {
-  await closeDb();
   await t.client.close();
 });
 
