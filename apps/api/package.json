@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "typecheck": "tsc --noEmit",
-    "db:generate": "echo \"drizzle schema lands in Phase 1\"",
-    "db:migrate": "echo \"drizzle schema lands in Phase 1\"",
-    "db:seed": "echo \"seed script lands in Phase 1\"",
-    "reconcile": "echo \"reconcile script lands in Phase 1\""
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:seed": "bun src/db/seed.ts",
+    "reconcile": "bun src/db/reconcile.ts"
   },
   "dependencies": {
     "@caribpay/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }
