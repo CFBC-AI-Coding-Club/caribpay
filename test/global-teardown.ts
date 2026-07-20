@@ -16,4 +16,10 @@ afterAll(async () => {
   } catch {
     // Redis module never loaded — nothing to close.
   }
+  try {
+    const { closeQueue } = await import("../apps/api/src/lib/queue");
+    await closeQueue();
+  } catch {
+    // Queue module never loaded — nothing to close.
+  }
 });
