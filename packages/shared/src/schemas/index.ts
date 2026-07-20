@@ -3,4 +3,5 @@ export * from "./user";
 export * from "./auth";
 export * from "./wallets";
 export * from "./transactions";
+export * from "./transfers";
 export * from "./fx";

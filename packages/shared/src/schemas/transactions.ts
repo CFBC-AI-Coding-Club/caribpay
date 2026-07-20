@@ -10,6 +10,7 @@ export const transactionSchema = z.object({
   sourceAmountMinor: z.number().int().positive(),
   destAmountMinor: z.number().int().positive(),
   fxRateUsed: z.string().nullable(),
+  note: z.string().nullable(),
   senderUserId: z.uuid().nullable(),
   recipientUserId: z.uuid().nullable(),
   failureReason: z.string().nullable(),
