@@ -168,3 +168,23 @@ export const idempotencyRecords = pgTable("idempotency_records", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Quick-contacts: a saved shortcut to another user's wallet address. The linked
+// user is resolved at save time so the display name and the counterparty are
+// pinned even if the address is later reused.
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => users.id),
+    contactUserId: uuid("contact_user_id")
+      .notNull()
+      .references(() => users.id),
+    walletAddress: text("wallet_address").notNull(),
+    displayName: text("display_name").notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("contacts_owner_address_uq").on(t.ownerUserId, t.walletAddress)],
+);

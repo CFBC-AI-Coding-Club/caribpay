@@ -41,7 +41,7 @@ export async function setupTestDb(): Promise<TestDb> {
 export async function truncateAll(client: SQL): Promise<void> {
   await client`
     TRUNCATE users, refresh_tokens, wallets, system_accounts, transactions,
-             ledger_entries, wallet_balances, fx_rates, idempotency_records
+             ledger_entries, wallet_balances, fx_rates, idempotency_records, contacts
     RESTART IDENTITY CASCADE
   `;
 }
