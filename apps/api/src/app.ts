@@ -7,6 +7,9 @@ import { healthRoutes } from "./routes/health";
 import { walletRoutes } from "./routes/wallets";
 import { fxRoutes } from "./routes/fx";
 import { transferRoutes } from "./routes/transfers";
+import { transactionRoutes } from "./routes/transactions";
+import { contactRoutes } from "./routes/contacts";
+import { qrRoutes } from "./routes/qr";
 import type { AppEnv } from "./app-env";
 
 export function buildApp(): Hono<AppEnv> {
@@ -21,5 +24,8 @@ export function buildApp(): Hono<AppEnv> {
   app.route("/api/v1/wallets", walletRoutes);
   app.route("/api/v1/fx", fxRoutes);
   app.route("/api/v1/transfers", transferRoutes);
+  app.route("/api/v1/transactions", transactionRoutes);
+  app.route("/api/v1/contacts", contactRoutes);
+  app.route("/api/v1/qr", qrRoutes);
   return app;
 }
