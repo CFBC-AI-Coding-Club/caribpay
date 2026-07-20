@@ -99,6 +99,7 @@ export const transactions = pgTable("transactions", {
   sourceAmountMinor: bigint("source_amount_minor", { mode: "number" }).notNull(),
   destAmountMinor: bigint("dest_amount_minor", { mode: "number" }).notNull(),
   fxRateUsed: numeric("fx_rate_used", { precision: 18, scale: 8 }),
+  note: text("note"),
   failureReason: text("failure_reason"),
   settledAt: timestamp("settled_at", { withTimezone: true }),
   ...timestamps,
