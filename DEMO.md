@@ -21,15 +21,47 @@ bun run db:migrate
 bun run db:seed:demo --reset
 ```
 
-Then start the two dev processes in separate terminals:
+Then start the backend:
 
 ```bash
 bun run dev:api      # Hono API + in-process settlement worker on :3000
-bun run dev:mobile   # Expo dev server; scan the QR with Expo Go
 ```
 
+### Installing the mobile app (development build)
+
+The app runs on **Expo SDK 57**, which is newer than the Expo Go published to the
+app stores — so it uses a **development build** (a small custom client) instead
+of Expo Go. You build the client once, install it on the phone, then iterate
+with the Metro dev server just like Expo Go.
+
+**Build the dev client once (cloud, no local Android SDK needed):**
+
+```bash
+cd apps/mobile
+bunx eas login             # first time only; needs a free Expo account
+bunx eas init              # first time only; links the project, writes the EAS project id
+bunx eas build --profile development --platform android
+```
+
+EAS returns an install link / QR for the resulting `.apk` — open it on the phone
+and install (allow "install from unknown sources"). The `development` profile is
+defined in `apps/mobile/eas.json`.
+
+> **Local alternative** (if you have Android Studio + SDK and a device/emulator):
+> `cd apps/mobile && bunx expo run:android` builds and installs the dev client
+> directly, no Expo account required.
+
+**Then, for the demo and every day after, just start Metro:**
+
+```bash
+bun run dev:mobile         # Expo dev server; open the dev-client app and it connects
+```
+
+Open the installed **CaribPay** dev-client app on the phone (not Expo Go) — it
+auto-connects to the Metro server, or scan the QR it shows.
+
 > **Physical device note:** the app auto-targets your dev machine's LAN IP at
-> port 3000. Make sure your phone is on the same Wi‑Fi and that inbound TCP 3000
+> port 3000. Make sure the phone is on the same Wi‑Fi and that inbound TCP 3000
 > is allowed through the host firewall. To force a specific address, set
 > `EXPO_PUBLIC_API_URL=http://<your-ip>:3000` before `dev:mobile`.
 
@@ -110,3 +142,5 @@ bun run reconcile   # recomputes every balance from ledger_entries; must be clea
   `dev:api`; check that terminal for errors and that Redis is up
   (`docker compose ps`).
 - **Balances look wrong:** run `bun run reconcile`; then re-seed with `--reset`.
+- **"Incompatible with Expo Go":** expected — this app uses a development build,
+  not Expo Go. Install the dev client (see setup above) and open that app.
