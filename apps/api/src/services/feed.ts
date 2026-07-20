@@ -1,14 +1,17 @@
-import { desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { TransactionsPage } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
 import { transactions } from "../db/schema";
 import { toPublicTransaction } from "./transfers";
 
+// The "Regional transfers" feed is about money moving between people, so it
+// excludes funding deposits/withdrawals even though the user is party to them.
+const FEED_TYPES = ["p2p_transfer", "fx_conversion"] as const;
+
 /**
- * Unified feed of every transaction the user is party to (sender or recipient),
+ * Unified feed of every transfer the user is party to (sender or recipient),
  * newest first. Keyset-paginated on (created_at, id) so new inserts never shift
- * an in-flight page. Deposits appear via the sender/recipient columns once
- * those flows attribute a user; the demo seed uses p2p transfers.
+ * an in-flight page.
  */
 export async function listUserTransactions(
   dbh: DbHandle,
@@ -28,7 +31,7 @@ export async function listUserTransactions(
   const rows = await dbh
     .select()
     .from(transactions)
-    .where(sql`(${partyCondition}) AND ${cursorCondition}`)
+    .where(and(inArray(transactions.type, FEED_TYPES), sql`(${partyCondition}) AND ${cursorCondition}`))
     .orderBy(desc(transactions.createdAt), desc(transactions.id))
     .limit(limit + 1);
 
