@@ -1,0 +1,25 @@
+# CaribPay reverse proxy. Caddy handles TLS automatically (Let's Encrypt).
+# Replace api.caribpay.example with the real API hostname.
+#
+# Install: copy this into /etc/caddy/Caddyfile (or import it) and run
+#   sudo systemctl reload caddy
+
+api.caribpay.example {
+	encode gzip
+
+	# Forward everything to the Bun/Hono API on the loopback interface.
+	reverse_proxy localhost:3000
+
+	# Basic hardening headers.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/caribpay.log
+	}
+}
