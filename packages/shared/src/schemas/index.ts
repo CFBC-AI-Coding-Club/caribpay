@@ -5,3 +5,5 @@ export * from "./wallets";
 export * from "./transactions";
 export * from "./transfers";
 export * from "./fx";
+export * from "./contacts";
+export * from "./qr";
