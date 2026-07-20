@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "CaribPay",
+    "slug": "caribpay",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "caribpay",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.caribpay.app"
+    },
+    "android": {
+      "package": "com.caribpay.app"
+    },
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}

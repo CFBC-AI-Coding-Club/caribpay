@@ -1,2 +1,7 @@
+[install]
+# Hoisted (npm-style) node_modules so Expo's Metro resolver finds transitive
+# deps via nodeModulesPaths; the isolated layout nests them under .bun/.
+linker = "hoisted"
+
 [test]
 preload = ["./test/global-teardown.ts"]
