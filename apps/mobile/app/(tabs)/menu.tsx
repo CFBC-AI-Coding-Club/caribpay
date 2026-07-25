@@ -1,104 +1,192 @@
-import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { createContactRequestSchema } from "@caribpay/shared";
-import { useContacts, useCreateContact, useLogout, useMe } from "@/api/hooks";
-import { ApiRequestError } from "@/api/client";
-import { Card, ErrorText, Field, Muted, PrimaryButton, colors } from "@/components/ui";
+import { Alert, ScrollView, View } from "react-native";
+import { useRouter } from "expo-router";
+import { COUNTRY_NAMES, homeCurrencyFor } from "@caribpay/shared";
+import { color, radius, space } from "@/theme";
+import { Icon, type IconName } from "@/components/Icon";
+import {
+  Avatar,
+  GradientCard,
+  Pill,
+  Row,
+  RowGroup,
+  Screen,
+  Skeleton,
+  Txt,
+} from "@/components/ui";
+import { useContacts, useLogout, useMe, useWallets } from "@/api/hooks";
+import { useAuthStore } from "@/stores/auth";
 
-export default function MenuScreen() {
-  const me = useMe();
-  const contacts = useContacts();
-  const logout = useLogout();
-  const createContact = useCreateContact();
-
-  const [address, setAddress] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  const onAddContact = () => {
-    setError(null);
-    setSaved(false);
-    const parsed = createContactRequestSchema.safeParse({ walletAddress: address, displayName });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the contact details");
-      return;
-    }
-    createContact.mutate(parsed.data, {
-      onSuccess: () => {
-        setAddress("");
-        setDisplayName("");
-        setSaved(true);
-      },
-      onError: (e) =>
-        setError(e instanceof ApiRequestError ? e.message : "Could not save contact"),
-    });
-  };
+function MenuItem({
+  icon,
+  label,
+  detail,
+  onPress,
+  tone = "primary",
+  last = false,
+  chevron = true,
+}: {
+  icon: IconName;
+  label: string;
+  detail?: string;
+  onPress?: () => void;
+  tone?: "primary" | "neutral" | "danger";
+  last?: boolean;
+  chevron?: boolean;
+}) {
+  const skin = {
+    primary: { bg: color.primarySoft, fg: color.link, label: color.ink },
+    neutral: { bg: color.neutralSoft, fg: color.inkMuted, label: color.ink },
+    danger: { bg: color.errorSoft, fg: color.error, label: color.error },
+  }[tone];
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Card>
-        <Text style={styles.name}>{me.data?.user.fullName ?? "—"}</Text>
-        <Muted>{me.data?.user.email ?? ""}</Muted>
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>Country: {me.data?.user.countryCode ?? "—"}</Text>
-          <Text style={styles.meta}>KYC: {me.data?.user.kycStatus ?? "—"}</Text>
+    <Row last={last} onPress={onPress}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, flex: 1 }}>
+        <View
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: radius.chip,
+            backgroundColor: skin.bg,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name={icon} size={19} color={skin.fg} strokeWidth={1.9} />
         </View>
-      </Card>
-
-      <Text style={styles.sectionTitle}>Add a contact</Text>
-      <Card>
-        <ErrorText message={error} />
-        {saved ? <Text style={styles.saved}>Contact saved.</Text> : null}
-        <Field
-          label="Wallet address"
-          value={address}
-          onChangeText={setAddress}
-          placeholder="CW-XXXX-XXXX-XXXX-XXXX"
-          autoCapitalize="characters"
-        />
-        <Field
-          label="Display name"
-          value={displayName}
-          onChangeText={setDisplayName}
-          placeholder="e.g. Marlon"
-          autoCapitalize="words"
-        />
-        <PrimaryButton
-          title="Save contact"
-          onPress={onAddContact}
-          loading={createContact.isPending}
-        />
-      </Card>
-
-      <Text style={styles.sectionTitle}>Contacts</Text>
-      {contacts.data === undefined || contacts.data.length === 0 ? (
-        <Muted>No saved contacts yet.</Muted>
-      ) : (
-        contacts.data.map((contact) => (
-          <Card key={contact.id} style={styles.contactCard}>
-            <Text style={styles.contactName}>{contact.displayName}</Text>
-            <Muted>{contact.walletAddress}</Muted>
-          </Card>
-        ))
-      )}
-
-      <View style={styles.signOut}>
-        <PrimaryButton title="Sign out" onPress={() => logout.mutate()} loading={logout.isPending} />
+        <View style={{ flex: 1 }}>
+          <Txt size={15} weight={700} color={skin.label}>
+            {label}
+          </Txt>
+          {detail !== undefined && (
+            <Txt size={12} weight={500} color={color.inkMuted} style={{ marginTop: 2 }}>
+              {detail}
+            </Txt>
+          )}
+        </View>
       </View>
-    </ScrollView>
+      {chevron && <Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />}
+    </Row>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 16, gap: 10 },
-  name: { fontSize: 20, fontWeight: "800", color: colors.text },
-  metaRow: { flexDirection: "row", gap: 16, marginTop: 10 },
-  meta: { color: colors.muted, fontSize: 13 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text, marginTop: 14 },
-  saved: { color: colors.primary, marginBottom: 10, fontWeight: "600" },
-  contactCard: { paddingVertical: 12 },
-  contactName: { fontSize: 15, fontWeight: "700", color: colors.text },
-  signOut: { marginTop: 24 },
-});
+export default function MenuScreen() {
+  const router = useRouter();
+  const me = useMe();
+  const wallets = useWallets();
+  const contacts = useContacts();
+  const logout = useLogout();
+  const sessionUser = useAuthStore((s) => s.user);
+
+  const user = me.data?.user ?? sessionUser;
+  const walletCount = wallets.data?.wallets.length ?? 0;
+  const contactCount = contacts.data?.length ?? 0;
+
+  function confirmLogout() {
+    Alert.alert("Log out?", "You'll need your email and password to get back in.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log out",
+        style: "destructive",
+        onPress: () => logout.mutate(undefined, { onSuccess: () => router.replace("/welcome") }),
+      },
+    ]);
+  }
+
+  return (
+    <Screen edges={{ bottom: false }}>
+      <View style={{ paddingHorizontal: space.gutter, paddingTop: space.sm, paddingBottom: 14 }}>
+        <Txt size={20} weight={800} tracking={-0.01}>
+          Menu
+        </Txt>
+      </View>
+
+      {user === null || user === undefined ? (
+        <View style={{ paddingHorizontal: space.gutter, gap: space.md }}>
+          <Skeleton height={92} radius={radius.cardLg} />
+          <Skeleton height={220} radius={radius.card} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }}>
+          <GradientCard
+            watermark={false}
+            style={{ marginHorizontal: space.gutter, padding: space.lg }}
+            onPress={() => router.push("/profile")}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <Avatar
+                name={user.fullName}
+                size={54}
+                country={user.countryCode}
+                currency={homeCurrencyFor(user.countryCode)}
+                badgeBackground={color.interactive}
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt size={17} weight={800} color={color.onDark} numberOfLines={1}>
+                  {user.fullName}
+                </Txt>
+                <Txt size={12} weight={500} color={color.onDarkFaint} style={{ marginTop: 2 }}>
+                  {COUNTRY_NAMES[user.countryCode] ?? user.countryCode}
+                </Txt>
+                {user.kycStatus === "verified" && (
+                  <Pill tone="onDark" label="KYC verified" icon="check" style={{ marginTop: 6 }} />
+                )}
+              </View>
+              <Icon name="chevronRight" size={20} color="rgba(255,255,255,0.8)" strokeWidth={2.2} />
+            </View>
+          </GradientCard>
+
+          <View style={{ paddingHorizontal: space.gutter, paddingTop: space.lg, gap: 10 }}>
+            <RowGroup paddingHorizontal={space.lg} style={{ borderRadius: radius.card }}>
+              <MenuItem icon="user" label="Profile" onPress={() => router.push("/profile")} />
+              <MenuItem
+                icon="card"
+                label="Wallets"
+                detail={`${walletCount} ${walletCount === 1 ? "currency" : "currencies"} open`}
+                onPress={() => router.push("/wallet/add")}
+              />
+              <MenuItem
+                icon="people"
+                label="Contacts"
+                detail={`${contactCount} saved`}
+                onPress={() => router.push("/(tabs)/contacts")}
+              />
+              <MenuItem
+                icon="activity"
+                label="Transfers"
+                last
+                onPress={() => router.push("/(tabs)/activity")}
+              />
+            </RowGroup>
+
+            <RowGroup paddingHorizontal={space.lg} style={{ borderRadius: radius.card }}>
+              <MenuItem
+                icon="help"
+                label="Help & support"
+                tone="neutral"
+                onPress={() =>
+                  Alert.alert(
+                    "Help & support",
+                    "This is a CANTO Innovation Challenge prototype — there's no support desk behind it yet.",
+                  )
+                }
+              />
+              <MenuItem
+                icon="logout"
+                label="Log out"
+                tone="danger"
+                chevron={false}
+                last
+                onPress={confirmLogout}
+              />
+            </RowGroup>
+
+            <Txt size={12} weight={500} color={color.inkFaint} align="center" style={{ paddingTop: 4 }}>
+              CaribPay v1.0.0 · Made for the Caribbean
+            </Txt>
+          </View>
+        </ScrollView>
+      )}
+    </Screen>
+  );
+}

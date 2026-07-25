@@ -2,62 +2,79 @@ import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
 import { useAuthStore } from "@/stores/auth";
+import { color, fontAssets } from "@/theme";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
-const AUTH_GROUPS = new Set(["(tabs)", "transfer"]);
+/** Routes reachable without a session. Everything else requires one. */
+const PUBLIC_ROOTS = new Set(["index", "welcome", "login", "register"]);
 
 /** Redirect between the auth screens and the app based on session state. */
-function useAuthGate(): void {
+function useAuthGate(ready: boolean): void {
   const status = useAuthStore((s) => s.status);
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (status === "loading") return;
+    if (!ready || status === "loading") return;
     const root = segments[0];
-    const inAuthedArea = root !== undefined && AUTH_GROUPS.has(root);
-    if (status === "unauthenticated" && inAuthedArea) {
-      router.replace("/login");
-    } else if (status === "authenticated" && (root === "login" || root === "register")) {
-      router.replace("/(tabs)/home");
-    } else if (status === "authenticated" && root === undefined) {
+    // The splash screen (root === undefined) sends users onward once we know.
+    const onPublic = root === undefined || PUBLIC_ROOTS.has(root);
+
+    if (status === "unauthenticated" && !onPublic) {
+      router.replace("/welcome");
+    } else if (status === "authenticated" && (root === undefined || root === "login" || root === "register" || root === "welcome")) {
       router.replace("/(tabs)/home");
     } else if (status === "unauthenticated" && root === undefined) {
-      router.replace("/login");
+      router.replace("/welcome");
     }
-  }, [status, segments, router]);
+  }, [ready, status, segments, router]);
 }
 
-function RootNavigator() {
-  useAuthGate();
+function RootNavigator({ ready }: { ready: boolean }) {
+  useAuthGate(ready);
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="welcome" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="transfer/[id]" options={{ headerShown: true, title: "Transfer" }} />
+      <Stack.Screen name="send/index" />
+      <Stack.Screen name="send/review" />
+      <Stack.Screen name="transfer/[id]" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="transaction/[id]" />
+      <Stack.Screen name="wallet/[id]" />
+      <Stack.Screen name="wallet/add" />
+      <Stack.Screen name="contact/add" />
+      <Stack.Screen name="receive" />
+      <Stack.Screen name="scan" options={{ animation: "fade" }} />
+      <Stack.Screen name="profile" />
     </Stack>
   );
 }
 
 export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
+  const [fontsLoaded, fontError] = useFonts(fontAssets);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
 
+  // Render nothing until the type is ready, otherwise the first paint flashes in
+  // the system font. A font *error* should not brick the app, so we proceed.
+  const ready = fontsLoaded || fontError !== null;
+  if (!ready) return null;
+
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
+        <RootNavigator ready={ready} />
       </SafeAreaProvider>
     </QueryClientProvider>
   );

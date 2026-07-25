@@ -1,41 +1,52 @@
+import { useEffect } from "react";
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
 import {
+  addressLookupResponseSchema,
   authResponseSchema,
   contactsResponseSchema,
   createContactResponseSchema,
+  createWalletResponseSchema,
   fxQuoteResponseSchema,
   meResponseSchema,
   qrReceiveResponseSchema,
+  qrResolveResponseSchema,
   transactionsPageSchema,
   transferResponseSchema,
   walletsResponseSchema,
+  type AddressLookupResponse,
   type Contact,
   type Currency,
   type FxQuote,
   type LoginRequest,
   type RegisterRequest,
   type Transaction,
-  type TransactionsPage,
   type WalletsResponse,
+  WALLET_ADDRESS_PATTERN,
 } from "@caribpay/shared";
 import { apiRequest } from "./client";
 import { useAuthStore } from "@/stores/auth";
 import { randomId } from "@/lib/id";
 
 export const queryKeys = {
+  me: ["me"] as const,
   wallets: ["wallets"] as const,
   transactions: ["transactions"] as const,
+  walletTransactions: (walletId: string) => ["wallet-transactions", walletId] as const,
   transfer: (id: string) => ["transfer", id] as const,
   contacts: ["contacts"] as const,
+  addressLookup: (address: string) => ["address-lookup", address] as const,
   qrReceive: (currency?: string) => ["qr", "receive", currency ?? "home"] as const,
   fxQuote: (from: string, to: string, amountMinor: number) =>
     ["fx", from, to, amountMinor] as const,
 };
+
+const PAGE_SIZE = 20;
 
 const TERMINAL_STATUSES: ReadonlySet<Transaction["status"]> = new Set(["settled", "failed"]);
 
@@ -46,16 +57,43 @@ export function useWallets(): UseQueryResult<WalletsResponse> {
   });
 }
 
-export function useTransactions(): UseQueryResult<TransactionsPage> {
-  return useQuery({
+/** Cursor-paginated feed across every wallet. Powers the Transfers tab. */
+export function useTransactions() {
+  return useInfiniteQuery({
     queryKey: queryKeys.transactions,
-    queryFn: () => apiRequest("/transactions?limit=20", { schema: transactionsPageSchema }),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      apiRequest(
+        `/transactions?limit=${PAGE_SIZE}${pageParam === undefined ? "" : `&cursor=${pageParam}`}`,
+        { schema: transactionsPageSchema },
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    select: (data) => data.pages.flatMap((page) => page.items),
+  });
+}
+
+/** Same feed, scoped to one wallet — includes `walletDeltaMinor` per row. */
+export function useWalletTransactions(walletId: string | undefined) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.walletTransactions(walletId ?? ""),
+    enabled: walletId !== undefined && walletId !== "",
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      apiRequest(
+        `/wallets/${walletId}/transactions?limit=${PAGE_SIZE}${
+          pageParam === undefined ? "" : `&cursor=${pageParam}`
+        }`,
+        { schema: transactionsPageSchema },
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    select: (data) => data.pages.flatMap((page) => page.items),
   });
 }
 
 /** Transfer detail. While the transfer is non-terminal, poll every 2s. */
 export function useTransfer(id: string): UseQueryResult<Transaction> {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: queryKeys.transfer(id),
     queryFn: async () => {
       const { transaction } = await apiRequest(`/transfers/${id}`, {
@@ -63,11 +101,23 @@ export function useTransfer(id: string): UseQueryResult<Transaction> {
       });
       return transaction;
     },
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
+    refetchInterval: (q) => {
+      const status = q.state.data?.status;
       return status !== undefined && TERMINAL_STATUSES.has(status) ? false : 2000;
     },
   });
+
+  // Settlement posts the credit leg, so balances and the feed are both stale the
+  // moment this transfer reaches a terminal state.
+  const status = query.data?.status;
+  const settled = status !== undefined && TERMINAL_STATUSES.has(status);
+  useEffect(() => {
+    if (!settled) return;
+    void queryClient.invalidateQueries({ queryKey: queryKeys.wallets });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions });
+  }, [settled, queryClient]);
+
+  return query;
 }
 
 export function useContacts(): UseQueryResult<Contact[]> {
@@ -181,15 +231,63 @@ export function useCreateTransfer() {
 
 export function useMe() {
   return useQuery({
-    queryKey: ["me"] as const,
+    queryKey: queryKeys.me,
     queryFn: () => apiRequest("/me", { schema: meResponseSchema }),
+  });
+}
+
+/** Open a wallet in an additional currency. */
+export function useCreateWallet() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (currency: Currency) => {
+      const { wallet } = await apiRequest("/wallets", {
+        method: "POST",
+        body: { currency },
+        schema: createWalletResponseSchema,
+      });
+      return wallet;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wallets });
+    },
+  });
+}
+
+/**
+ * Who owns a wallet address. Enabled only for well-formed addresses so we don't
+ * fire a request on every keystroke of a partially typed one.
+ */
+export function useAddressLookup(
+  address: string,
+  enabled = true,
+): UseQueryResult<AddressLookupResponse> {
+  const complete = WALLET_ADDRESS_PATTERN.test(address);
+  return useQuery({
+    queryKey: queryKeys.addressLookup(address),
+    enabled: enabled && complete,
+    retry: false,
+    queryFn: () =>
+      apiRequest(`/wallets/lookup?address=${encodeURIComponent(address)}`, {
+        schema: addressLookupResponseSchema,
+      }),
+  });
+}
+
+/** Verify a scanned `caribpay://pay?...` payload's signature and resolve it. */
+export function useResolveQr() {
+  return useMutation({
+    mutationFn: (payload: string) =>
+      apiRequest(`/qr/resolve?payload=${encodeURIComponent(payload)}`, {
+        schema: qrResolveResponseSchema,
+      }),
   });
 }
 
 export function useCreateContact() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { walletAddress: string; displayName: string }) =>
+    mutationFn: (input: { walletAddress: string; displayName: string; pinned: boolean }) =>
       apiRequest("/contacts", {
         method: "POST",
         body: input,

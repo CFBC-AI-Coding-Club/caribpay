@@ -1,120 +1,184 @@
 import { useState } from "react";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { useRouter } from "expo-router";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { Link } from "expo-router";
-import { registerRequestSchema } from "@caribpay/shared";
+  COUNTRY_NAMES,
+  CURRENCY_SYMBOLS,
+  FLAG_COUNTRIES,
+  homeCurrencyFor,
+  type FlagCountry,
+} from "@caribpay/shared";
+import { color, space } from "@/theme";
+import { Flag } from "@/components/Flag";
+import {
+  Button,
+  Notice,
+  PickerSheet,
+  SelectField,
+  SheetScreen,
+  TextField,
+  Txt,
+} from "@/components/ui";
 import { useRegister } from "@/api/hooks";
 import { ApiRequestError } from "@/api/client";
-import { Field, PrimaryButton, ErrorText, colors } from "@/components/ui";
 
-// Country → home currency is mapped server-side; these cover the demo islands.
-const COUNTRIES: Array<{ code: string; label: string }> = [
-  { code: "KN", label: "St. Kitts (XCD)" },
-  { code: "VC", label: "St. Vincent (XCD)" },
-  { code: "JM", label: "Jamaica (JMD)" },
-  { code: "BB", label: "Barbados (BBD)" },
-  { code: "TT", label: "Trinidad (TTD)" },
-  { code: "US", label: "USA (USD)" },
-];
+const COUNTRY_OPTIONS = FLAG_COUNTRIES.map((code) => ({
+  value: code,
+  label: COUNTRY_NAMES[code] ?? code,
+  detail: `${CURRENCY_SYMBOLS[homeCurrencyFor(code)]} · ${homeCurrencyFor(code)}`,
+  leading: <Flag country={code} size={30} />,
+}));
 
 export default function RegisterScreen() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [countryCode, setCountryCode] = useState("KN");
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const register = useRegister();
 
-  const onSubmit = () => {
-    setError(null);
-    const parsed = registerRequestSchema.safeParse({ email, password, fullName, countryCode });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Please check your details");
-      return;
-    }
-    register.mutate(parsed.data, {
-      onError: (e) =>
-        setError(e instanceof ApiRequestError ? e.message : "Could not create account"),
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [country, setCountry] = useState<FlagCountry>("KN");
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const homeCurrency = homeCurrencyFor(country);
+  const passwordTooShort = password !== "" && password.length < 8;
+  const canSubmit =
+    fullName.trim() !== "" &&
+    email.trim() !== "" &&
+    password.length >= 8 &&
+    !register.isPending;
+
+  function submit() {
+    if (!canSubmit) return;
+    register.mutate({
+      fullName: fullName.trim(),
+      email: email.trim(),
+      password,
+      countryCode: country,
     });
-  };
+  }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>Create account</Text>
-
-        <ErrorText message={error} />
-        <Field label="Full name" value={fullName} onChangeText={setFullName} placeholder="Jane Doe" autoCapitalize="words" />
-        <Field
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          placeholder="you@example.com"
-        />
-        <Field
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="At least 8 characters"
-        />
-
-        <Text style={styles.fieldLabel}>Country</Text>
-        <View style={styles.countryGrid}>
-          {COUNTRIES.map((country) => {
-            const selected = country.code === countryCode;
-            return (
-              <Pressable
-                key={country.code}
-                onPress={() => setCountryCode(country.code)}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {country.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+    <SheetScreen
+      header={
+        <View style={{ paddingHorizontal: 26, paddingTop: 6 }}>
+          <Image
+            accessibilityIgnoresInvertColors
+            source={require("../assets/logo-mark.png")}
+            style={{ width: 36, height: 36 }}
+            resizeMode="contain"
+          />
+          <Txt size={24} weight={800} color={color.onDark} tracking={-0.02} style={{ marginTop: 20 }}>
+            Create your account
+          </Txt>
+          <Txt size={15} weight={500} color={color.onDarkMuted} style={{ marginTop: 6 }}>
+            Join the region-wide wallet.
+          </Txt>
         </View>
+      }
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={{ padding: space.xxl, paddingTop: 26, gap: space.md }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {register.isError && (
+            <Notice
+              tone="error"
+              title="Could not create your account"
+              body={
+                register.error instanceof ApiRequestError && register.error.status === 409
+                  ? "An account already exists with that email address."
+                  : register.error.message
+              }
+            />
+          )}
 
-        <PrimaryButton title="Create account" onPress={onSubmit} loading={register.isPending} />
+          <TextField
+            label="Full name"
+            height={52}
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Your name"
+            autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+          />
+          <TextField
+            label="Email"
+            height={52}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+          />
+          <TextField
+            label="Password"
+            height={52}
+            secure
+            value={password}
+            onChangeText={setPassword}
+            placeholder="At least 8 characters"
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            error={passwordTooShort ? "Use at least 8 characters." : undefined}
+          />
+          <SelectField
+            label="Country"
+            value={COUNTRY_NAMES[country] ?? country}
+            leading={<Flag country={country} size={24} />}
+            onPress={() => setPickerOpen(true)}
+          />
 
-        <Link href="/login" style={styles.link}>
-          <Text style={styles.linkText}>Already have an account? Sign in</Text>
-        </Link>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <Notice
+            tone="primary"
+            icon="info"
+            title={`Your ${CURRENCY_SYMBOLS[homeCurrency]} home wallet`}
+            body={`We'll open your ${CURRENCY_SYMBOLS[homeCurrency]} (${homeCurrency}) wallet automatically when you join.`}
+          />
+
+          <Button
+            label="Create account"
+            onPress={submit}
+            loading={register.isPending}
+            disabled={!canSubmit}
+            style={{ marginTop: 2 }}
+          />
+
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Txt size={13} weight={500} color={color.inkMuted}>
+              Already have an account?
+            </Txt>
+            <Pressable onPress={() => router.replace("/login")} hitSlop={12} accessibilityRole="link">
+              <Txt size={13} weight={700} color={color.link}>
+                Log in
+              </Txt>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <PickerSheet
+        visible={pickerOpen}
+        title="Where do you live?"
+        options={COUNTRY_OPTIONS}
+        value={country}
+        onSelect={setCountry}
+        onClose={() => setPickerOpen(false)}
+      />
+    </SheetScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  inner: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  brand: { fontSize: 28, fontWeight: "800", color: colors.text, marginBottom: 24 },
-  fieldLabel: { color: colors.muted, marginBottom: 8, fontSize: 13, fontWeight: "600" },
-  countryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 22 },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: colors.card,
-  },
-  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.text, fontSize: 13 },
-  chipTextSelected: { color: colors.primaryText, fontWeight: "700" },
-  link: { marginTop: 20, alignSelf: "center" },
-  linkText: { color: colors.primary, fontWeight: "600" },
-});
