@@ -14,10 +14,6 @@
     "android": {
       "package": "com.caribpay.app"
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store",
-      "expo-status-bar"
-    ]
+    "plugins": ["expo-router", "expo-secure-store"]
   }
 }
