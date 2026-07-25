@@ -67,9 +67,14 @@ caribpay/
 
 ## Local environment note
 
+**See [RUNNING.md](RUNNING.md) for the full machine-specific runbook** — startup order, phone
+connectivity, demo accounts, and a troubleshooting table. The essentials:
+
 Docker on this machine runs inside WSL2 Ubuntu (no Docker Desktop). The PowerShell `docker` command is a shim that forwards to WSL; published ports are reachable from Windows at `localhost`. The redis container maps to host port 6380 here (native WSL redis owns 6379) — see the root `.env`.
 
-**Run `bun test` through WSL on this machine** (`wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin/bun test"`): Bun for Windows (≤1.3.14) segfaults in bun:test under postgres connection churn. Plain `bun` scripts (dev server, migrate, seed) are fine on Windows. Linux/macOS teammates and CI are unaffected.
+**Run `bun test` through WSL on this machine** (`wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin/bun test"`): Bun for Windows (≤1.3.14) hangs or segfaults in bun:test under postgres connection churn. Everything else — the API server, `db:migrate`, `db:seed`, `reconcile`, Metro — runs fine on Windows. Linux/macOS teammates and CI are unaffected.
+
+**Before debugging any DB failure, check that WSL is alive:** `(Get-Process wsl).Count`. With no persistent `wsl.exe`, WSL tears down the distro ~10 s after the last command exits and takes dockerd + both containers with it, which surfaces as `ERR_POSTGRES_CONNECTION_CLOSED` mid-query, `ECONNREFUSED` on redis, or `db:migrate` failing on `CREATE SCHEMA` — all easily misread as driver bugs. Fix with `Start-ScheduledTask -TaskName "WSL2-Docker-Keepalive"`.
 
 ---
 
