@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import {
+  addressLookupQuerySchema,
+  addressLookupResponseSchema,
   createWalletRequestSchema,
   createWalletResponseSchema,
   transactionsPageQuerySchema,
@@ -11,6 +13,7 @@ import { requireAuth } from "../middleware/auth";
 import {
   createAdditionalWallet,
   listWalletsWithTotal,
+  lookupAddress,
   walletTransactionsPage,
 } from "../services/wallets";
 import type { AppEnv } from "../app-env";
@@ -28,6 +31,13 @@ walletRoutes.post("/", async (c) => {
   const body = createWalletRequestSchema.parse(await c.req.json());
   const wallet = await createAdditionalWallet(db, c.get("userId"), body.currency);
   return c.json(createWalletResponseSchema.parse({ wallet }), 201);
+});
+
+// Declared before "/:id/..." so the literal segment is never taken for an id.
+walletRoutes.get("/lookup", async (c) => {
+  const { address } = addressLookupQuerySchema.parse(c.req.query());
+  const result = await lookupAddress(db, c.get("userId"), address);
+  return c.json(addressLookupResponseSchema.parse(result), 200);
 });
 
 walletRoutes.get("/:id/transactions", async (c) => {

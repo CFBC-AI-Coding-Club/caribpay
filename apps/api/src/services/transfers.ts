@@ -5,6 +5,7 @@ import { systemAccounts, transactions, users, wallets } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { isUniqueViolation } from "../lib/pg-errors";
 import { enqueueSettlement } from "../lib/queue";
+import { resolveParty, type PartyView } from "./counterparties";
 import { getLatestRate, getQuote } from "./fx";
 import {
   InsufficientBalanceError,
@@ -14,9 +15,16 @@ import {
 
 type TransactionRow = typeof transactions.$inferSelect;
 
-export function toPublicTransaction(row: TransactionRow): Transaction {
+/**
+ * Shape a transaction row for the API. `party` is viewer-relative (who the other
+ * side is, and whether the money came in or went out), so it is a required
+ * argument — there is no correct viewer-agnostic answer.
+ */
+export function toPublicTransaction(row: TransactionRow, party: PartyView): Transaction {
   return {
     id: row.id,
+    direction: party.direction,
+    counterparty: party.counterparty,
     type: row.type,
     status: row.status,
     sourceCurrency: row.sourceCurrency,
@@ -183,7 +191,8 @@ export async function createTransfer(
         .from(transactions)
         .where(eq(transactions.idempotencyKey, idempotencyKey));
       if (existing !== undefined && existing.senderUserId === userId) {
-        return { transaction: toPublicTransaction(existing), replayed: true };
+        const party = await resolveParty(dbh, userId, existing);
+        return { transaction: toPublicTransaction(existing, party), replayed: true };
       }
       throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "Idempotency key belongs to another request");
     }
@@ -191,7 +200,10 @@ export async function createTransfer(
   }
 
   await enqueueSettlement(row.id);
-  return { transaction: toPublicTransaction(row), replayed: false };
+  return {
+    transaction: toPublicTransaction(row, await resolveParty(dbh, userId, row)),
+    replayed: false,
+  };
 }
 
 /** Post the credit leg and flip to settled. No-op unless still pending_settlement. */
@@ -292,5 +304,5 @@ export async function getTransferForUser(
   if (row === undefined || (row.senderUserId !== userId && row.recipientUserId !== userId)) {
     throw new ApiError(404, "TRANSFER_NOT_FOUND", "Transfer not found");
   }
-  return toPublicTransaction(row);
+  return toPublicTransaction(row, await resolveParty(dbh, userId, row));
 }

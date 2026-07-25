@@ -29,6 +29,13 @@
       "when": 1784554713253,
       "tag": "0003_add_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784937943377,
+      "tag": "0004_add_contact_pinned",
+      "breakpoints": true
     }
   ]
 }

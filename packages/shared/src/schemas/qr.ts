@@ -20,5 +20,7 @@ export const qrResolveResponseSchema = z.object({
   walletAddress: z.string().regex(WALLET_ADDRESS_PATTERN),
   currency: z.enum(SUPPORTED_CURRENCIES),
   displayName: z.string(),
+  /** Covered by the signature, so it cannot be swapped for another country. */
+  countryCode: z.string().length(2),
 });
 export type QrResolveResponse = z.infer<typeof qrResolveResponseSchema>;

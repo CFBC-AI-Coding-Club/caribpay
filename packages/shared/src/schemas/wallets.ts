@@ -19,6 +19,24 @@ export const walletsResponseSchema = z.object({
 });
 export type WalletsResponse = z.infer<typeof walletsResponseSchema>;
 
+/**
+ * Public directory lookup for a wallet address, so "Add contact" and "Send to
+ * address" can confirm who they are about to save or pay before committing.
+ * Exposes no more than a completed transfer already would, and is auth-gated.
+ */
+export const addressLookupQuerySchema = z.object({
+  address: z.string().regex(WALLET_ADDRESS_PATTERN, "Not a valid wallet address"),
+});
+export type AddressLookupQuery = z.infer<typeof addressLookupQuerySchema>;
+
+export const addressLookupResponseSchema = z.object({
+  walletAddress: z.string().regex(WALLET_ADDRESS_PATTERN),
+  currency: z.enum(SUPPORTED_CURRENCIES),
+  displayName: z.string(),
+  countryCode: z.string().length(2),
+});
+export type AddressLookupResponse = z.infer<typeof addressLookupResponseSchema>;
+
 export const createWalletRequestSchema = z.object({
   currency: z.enum(SUPPORTED_CURRENCIES),
 });

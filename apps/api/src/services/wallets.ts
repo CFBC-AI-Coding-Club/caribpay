@@ -1,9 +1,16 @@
-import { desc, eq, sql } from "drizzle-orm";
-import { applyRate, homeCurrencyFor, type Currency, type Wallet } from "@caribpay/shared";
+import { and, desc, eq, sql } from "drizzle-orm";
+import {
+  applyRate,
+  homeCurrencyFor,
+  type AddressLookupResponse,
+  type Currency,
+  type Wallet,
+} from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
-import { ledgerEntries, transactions, users, walletBalances, wallets } from "../db/schema";
+import { contacts, ledgerEntries, transactions, users, walletBalances, wallets } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { isUniqueViolation } from "../lib/pg-errors";
+import { resolveParties } from "./counterparties";
 import { getLatestRate } from "./fx";
 
 // No 0/O/1/I/L so addresses stay unambiguous when read aloud or retyped.
@@ -122,6 +129,46 @@ export interface WalletTransactionsPage {
  * is the last row's transaction id; its created_at is resolved in SQL so
  * microsecond precision never round-trips through a JS Date.
  */
+/**
+ * Resolve a wallet address to its owner's display identity. Returns the saved
+ * contact name when the caller already knows them, so the same person reads the
+ * same way here as everywhere else in the app.
+ */
+export async function lookupAddress(
+  dbh: DbHandle,
+  viewerUserId: string,
+  address: string,
+): Promise<AddressLookupResponse> {
+  const [row] = await dbh
+    .select({
+      ownerUserId: wallets.userId,
+      currency: wallets.currency,
+      address: wallets.address,
+      fullName: users.fullName,
+      countryCode: users.countryCode,
+    })
+    .from(wallets)
+    .innerJoin(users, eq(users.id, wallets.userId))
+    .where(eq(wallets.address, address));
+  if (row === undefined) {
+    throw new ApiError(404, "ADDRESS_NOT_FOUND", "No wallet found for that address");
+  }
+  if (row.ownerUserId === viewerUserId) {
+    throw new ApiError(422, "OWN_ADDRESS", "That is your own wallet address");
+  }
+  const [saved] = await dbh
+    .select({ displayName: contacts.displayName })
+    .from(contacts)
+    .where(and(eq(contacts.ownerUserId, viewerUserId), eq(contacts.contactUserId, row.ownerUserId)));
+
+  return {
+    walletAddress: row.address,
+    currency: row.currency,
+    displayName: saved?.displayName ?? row.fullName,
+    countryCode: row.countryCode,
+  };
+}
+
 export async function walletTransactionsPage(
   dbh: DbHandle,
   userId: string,
@@ -168,7 +215,8 @@ export async function walletTransactionsPage(
     .limit(limit + 1);
 
   const page = rows.slice(0, limit);
-  const items = page.map((row) => ({
+  const parties = await resolveParties(dbh, userId, page);
+  const items = page.map((row, i) => ({
     id: row.id,
     type: row.type,
     status: row.status,
@@ -184,6 +232,8 @@ export async function walletTransactionsPage(
     settledAt: row.settledAt === null ? null : row.settledAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     walletDeltaMinor: Number(row.walletDeltaMinor),
+    direction: parties[i]!.direction,
+    counterparty: parties[i]!.counterparty,
   }));
   return {
     items,

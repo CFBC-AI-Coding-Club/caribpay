@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   char,
   check,
   index,
@@ -184,6 +185,8 @@ export const contacts = pgTable(
       .references(() => users.id),
     walletAddress: text("wallet_address").notNull(),
     displayName: text("display_name").notNull(),
+    /** Surfaced in the Contacts screen's "Quick send" row. */
+    pinned: boolean("pinned").notNull().default(false),
     ...timestamps,
   },
   (t) => [uniqueIndex("contacts_owner_address_uq").on(t.ownerUserId, t.walletAddress)],

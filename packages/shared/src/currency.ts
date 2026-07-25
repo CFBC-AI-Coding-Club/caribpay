@@ -1,4 +1,4 @@
-import { CURRENCY_EXPONENTS, type Currency } from "./constants";
+import { CURRENCY_EXPONENTS, CURRENCY_SYMBOLS, type Currency } from "./constants";
 
 const AMOUNT_PATTERN = /^(-?)(\d+)(?:\.(\d+))?$/;
 
@@ -76,6 +76,85 @@ export function applyRate(amountMinor: number, rate: string): number {
     throw new RangeError(`Converted amount out of safe integer range`);
   }
   return asNumber;
+}
+
+/** Insert thousands separators into a run of digits. Pure string work — no floats. */
+function group(digits: string): string {
+  let out = "";
+  for (let i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 === 0) out += ",";
+    out += digits[i];
+  }
+  return out;
+}
+
+export interface FormatAmountOptions {
+  /** Prefix the currency symbol (e.g. "EC$1,500.50"). Default true. */
+  symbol?: boolean;
+  /**
+   * Sign handling. "auto" shows "-" only for negatives (default); "always"
+   * shows an explicit "+"/"−" for credits and debits; "never" formats the
+   * magnitude and leaves the caller to convey direction.
+   */
+  sign?: "auto" | "always" | "never";
+}
+
+/**
+ * Format minor units the way the CaribPay UI shows money:
+ * `formatAmount(482050, "XCD")` -> "EC$4,820.50".
+ *
+ * Deliberately avoids Intl: Hermes' Intl.NumberFormat cannot take an exact
+ * decimal *string*, and routing money through a JS number would reintroduce
+ * float error. Grouping is done on the digit string instead.
+ */
+export function formatAmount(
+  amountMinor: number,
+  currency: Currency,
+  options: FormatAmountOptions = {},
+): string {
+  const { symbol = true, sign = "auto" } = options;
+  const decimal = fromMinor(amountMinor, currency);
+  const negative = decimal.startsWith("-");
+  const [whole = "0", frac] = decimal.replace("-", "").split(".");
+
+  let prefix = "";
+  if (sign === "always") prefix = negative ? "−" : "+";
+  else if (sign === "auto" && negative) prefix = "−";
+
+  const body = group(whole) + (frac === undefined ? "" : `.${frac}`);
+  return `${prefix}${symbol ? CURRENCY_SYMBOLS[currency] : ""}${body}`;
+}
+
+/**
+ * Split an amount for the hero balance card, which renders the symbol and the
+ * cents smaller than the dollars: "EC$" / "10,415" / ".60".
+ */
+export function splitAmount(
+  amountMinor: number,
+  currency: Currency,
+): { symbol: string; whole: string; fraction: string } {
+  const decimal = fromMinor(Math.abs(amountMinor), currency);
+  const [whole = "0", frac] = decimal.split(".");
+  return {
+    symbol: CURRENCY_SYMBOLS[currency],
+    whole: group(whole),
+    fraction: frac === undefined ? "" : `.${frac}`,
+  };
+}
+
+/**
+ * Human-readable FX rate line, e.g. "1 EC$ = 57.78 J$". Rates arrive as 8-dp
+ * decimal strings; we trim to `precision` significant decimals for display
+ * without ever parsing them as floats.
+ */
+export function formatRate(rate: string, from: Currency, to: Currency, precision = 2): string {
+  const [whole = "0", frac = ""] = rate.split(".");
+  // A sub-unit rate (e.g. XCD->USD at 0.37) needs more decimals to stay useful.
+  const digits = whole === "0" ? Math.max(precision, 4) : precision;
+  // Pad rather than trim, so a pegged rate reads "2.70" and not "2.7".
+  const shown = frac.slice(0, digits).padEnd(digits, "0");
+  const value = digits === 0 ? group(whole) : `${group(whole)}.${shown}`;
+  return `1 ${CURRENCY_SYMBOLS[from]} = ${value} ${CURRENCY_SYMBOLS[to]}`;
 }
 
 /** Format minor units for display, e.g. formatMoney(150050, "XCD") -> "XCD 1,500.50". */

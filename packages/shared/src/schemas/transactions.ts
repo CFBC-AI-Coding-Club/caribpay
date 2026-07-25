@@ -1,6 +1,23 @@
 import { z } from "zod";
 import { SUPPORTED_CURRENCIES, TRANSACTION_STATUSES, TRANSACTION_TYPES } from "../constants";
 
+/**
+ * Display identity of the other party to a transfer, resolved for the
+ * requesting user: their saved contact name if they have one, otherwise the
+ * counterparty's own name. The address is the counterparty's wallet in *that
+ * leg's* currency, which is what the UI shows next to their name.
+ */
+export const counterpartySchema = z.object({
+  displayName: z.string(),
+  walletAddress: z.string(),
+  countryCode: z.string().length(2),
+});
+export type Counterparty = z.infer<typeof counterpartySchema>;
+
+/** Money direction relative to the requesting user. */
+export const TRANSFER_DIRECTIONS = ["in", "out", "self"] as const;
+export type TransferDirection = (typeof TRANSFER_DIRECTIONS)[number];
+
 export const transactionSchema = z.object({
   id: z.uuid(),
   type: z.enum(TRANSACTION_TYPES),
@@ -18,6 +35,10 @@ export const transactionSchema = z.object({
   createdAt: z.string(),
   /** Net effect on the wallet the feed was scoped to; absent in unscoped feeds. */
   walletDeltaMinor: z.number().int().optional(),
+  /** Whether the requesting user sent or received this. */
+  direction: z.enum(TRANSFER_DIRECTIONS),
+  /** Null when the user is both parties, or the other side is a system movement. */
+  counterparty: counterpartySchema.nullable(),
 });
 export type Transaction = z.infer<typeof transactionSchema>;
 

@@ -196,6 +196,8 @@ async function linkContacts(dbh: DbHandle, seeded: Map<string, SeededUser>): Pro
         contactUserId: target.userId,
         walletAddress: target.address,
         displayName: spec.fullName.split(" ")[0]!,
+        // Pinned so the Contacts screen's "Quick send" row is populated in a demo.
+        pinned: true,
       });
     }
   }

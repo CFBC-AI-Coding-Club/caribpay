@@ -9,6 +9,63 @@ export const CURRENCY_EXPONENTS: Record<Currency, number> = {
   USD: 2,
 };
 
+/** Display symbols, as shown throughout the CaribPay UI. */
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  XCD: "EC$",
+  JMD: "J$",
+  BBD: "Bds$",
+  TTD: "TT$",
+  USD: "US$",
+};
+
+export const CURRENCY_NAMES: Record<Currency, string> = {
+  XCD: "East Caribbean $",
+  JMD: "Jamaican Dollar",
+  BBD: "Barbadian Dollar",
+  TTD: "Trinidad & Tobago $",
+  USD: "US Dollar",
+};
+
+/** Countries with a designed flag. Used for wallet, contact, and profile chips. */
+export const FLAG_COUNTRIES = ["KN", "JM", "BB", "TT", "VC", "US"] as const;
+export type FlagCountry = (typeof FLAG_COUNTRIES)[number];
+
+export const COUNTRY_NAMES: Record<string, string> = {
+  AG: "Antigua & Barbuda",
+  AI: "Anguilla",
+  BB: "Barbados",
+  DM: "Dominica",
+  GD: "Grenada",
+  JM: "Jamaica",
+  KN: "St. Kitts & Nevis",
+  LC: "St. Lucia",
+  MS: "Montserrat",
+  TT: "Trinidad & Tobago",
+  US: "United States",
+  VC: "St. Vincent & the Grenadines",
+};
+
+/**
+ * Representative country for a currency, for flag display when we only know the
+ * currency (e.g. a wallet row). XCD spans eight territories — KN is the
+ * prototype's home market, so it stands in for the zone.
+ */
+export const CURRENCY_TO_COUNTRY: Record<Currency, FlagCountry> = {
+  XCD: "KN",
+  JMD: "JM",
+  BBD: "BB",
+  TTD: "TT",
+  USD: "US",
+};
+
+/** Narrow an arbitrary ISO code to one we have a flag for, falling back to the currency's. */
+export function flagCountryFor(countryCode: string | null | undefined, currency: Currency): FlagCountry {
+  const upper = (countryCode ?? "").toUpperCase();
+  return (FLAG_COUNTRIES as readonly string[]).includes(upper)
+    ? (upper as FlagCountry)
+    : CURRENCY_TO_COUNTRY[currency];
+}
+
 export const TRANSACTION_TYPES = [
   "p2p_transfer",
   "deposit",

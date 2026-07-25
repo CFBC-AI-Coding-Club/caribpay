@@ -13,22 +13,27 @@ import { users, wallets } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { env } from "../env";
 
-// The signature covers address + currency + name so none can be swapped without
-// invalidating it. HMAC-SHA256, hex, truncated to 160 bits (plenty, keeps the
-// QR small).
-function sign(address: string, currency: string, name: string): string {
+// The signature covers every field so none can be swapped without invalidating
+// it. HMAC-SHA256, hex, truncated to 160 bits (plenty, keeps the QR small).
+function sign(address: string, currency: string, name: string, country: string): string {
   return createHmac("sha256", env.qrHmacSecret)
-    .update(`${address}\n${currency}\n${name}`)
+    .update(`${address}\n${currency}\n${name}\n${country}`)
     .digest("hex")
     .slice(0, 40);
 }
 
-function buildPayload(address: string, currency: Currency, name: string): string {
+function buildPayload(
+  address: string,
+  currency: Currency,
+  name: string,
+  country: string,
+): string {
   const params = new URLSearchParams({
     address,
     currency,
     name,
-    sig: sign(address, currency, name),
+    country,
+    sig: sign(address, currency, name, country),
   });
   return `caribpay://pay?${params.toString()}`;
 }
@@ -62,12 +67,18 @@ export async function buildReceivePayload(
     walletAddress: row.address,
     currency: resolvedCurrency,
     displayName: user.fullName,
-    payload: buildPayload(row.address, resolvedCurrency, user.fullName),
+    payload: buildPayload(row.address, resolvedCurrency, user.fullName, user.countryCode),
   };
 }
 
-function verifySignature(address: string, currency: string, name: string, sig: string): boolean {
-  const expected = sign(address, currency, name);
+function verifySignature(
+  address: string,
+  currency: string,
+  name: string,
+  country: string,
+  sig: string,
+): boolean {
+  const expected = sign(address, currency, name, country);
   if (sig.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
@@ -89,15 +100,20 @@ export function resolvePayload(payload: string): QrResolveResponse {
   const address = url.searchParams.get("address") ?? "";
   const currency = url.searchParams.get("currency") ?? "";
   const name = url.searchParams.get("name") ?? "";
+  const country = url.searchParams.get("country") ?? "";
   const sig = url.searchParams.get("sig") ?? "";
 
-  if (!WALLET_ADDRESS_PATTERN.test(address) || !isSupportedCurrency(currency)) {
+  if (
+    !WALLET_ADDRESS_PATTERN.test(address) ||
+    !isSupportedCurrency(currency) ||
+    country.length !== 2
+  ) {
     throw new ApiError(400, "QR_INVALID", "QR payload is missing required fields");
   }
-  if (!verifySignature(address, currency, name, sig)) {
+  if (!verifySignature(address, currency, name, country, sig)) {
     throw new ApiError(400, "QR_SIGNATURE_INVALID", "QR signature does not verify");
   }
-  return { walletAddress: address, currency, displayName: name };
+  return { walletAddress: address, currency, displayName: name, countryCode: country };
 }
 
 function isSupportedCurrency(value: string): value is Currency {

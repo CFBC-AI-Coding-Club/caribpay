@@ -20,6 +20,12 @@ contactRoutes.get("/", async (c) => {
 
 contactRoutes.post("/", async (c) => {
   const body = createContactRequestSchema.parse(await c.req.json());
-  const contact = await createContact(db, c.get("userId"), body.walletAddress, body.displayName);
+  const contact = await createContact(
+    db,
+    c.get("userId"),
+    body.walletAddress,
+    body.displayName,
+    body.pinned,
+  );
   return c.json(createContactResponseSchema.parse({ contact }), 201);
 });

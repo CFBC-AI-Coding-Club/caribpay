@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { applyRate, formatMoney, fromMinor, toMinor } from "../src/currency";
+import {
+  applyRate,
+  formatAmount,
+  formatMoney,
+  formatRate,
+  fromMinor,
+  splitAmount,
+  toMinor,
+} from "../src/currency";
 
 describe("toMinor", () => {
   test("parses decimal strings exactly", () => {
@@ -110,5 +118,82 @@ describe("formatMoney", () => {
   test("formats negative amounts", () => {
     expect(formatMoney(-2500, "USD")).toContain("25.00");
     expect(formatMoney(-2500, "USD")).toMatch(/[-(]/);
+  });
+});
+
+describe("formatAmount", () => {
+  test("uses the UI's currency symbols with grouping", () => {
+    expect(formatAmount(482050, "XCD")).toBe("EC$4,820.50");
+    expect(formatAmount(9_240_000, "JMD")).toBe("J$92,400.00");
+    expect(formatAmount(124000, "BBD")).toBe("Bds$1,240.00");
+    expect(formatAmount(86000, "USD")).toBe("US$860.00");
+  });
+
+  test("groups every three digits, however large", () => {
+    expect(formatAmount(123_456_789, "USD")).toBe("US$1,234,567.89");
+    expect(formatAmount(100, "USD")).toBe("US$1.00");
+    expect(formatAmount(0, "BBD")).toBe("Bds$0.00");
+  });
+
+  test("sign: auto marks only negatives", () => {
+    expect(formatAmount(-25000, "XCD")).toBe("−EC$250.00");
+    expect(formatAmount(25000, "XCD")).toBe("EC$250.00");
+  });
+
+  test("sign: always marks credits and debits explicitly", () => {
+    expect(formatAmount(30000, "XCD", { sign: "always" })).toBe("+EC$300.00");
+    expect(formatAmount(-30000, "XCD", { sign: "always" })).toBe("−EC$300.00");
+    expect(formatAmount(0, "XCD", { sign: "always" })).toBe("+EC$0.00");
+  });
+
+  test("sign: never formats the magnitude alone", () => {
+    expect(formatAmount(-30000, "XCD", { sign: "never" })).toBe("EC$300.00");
+  });
+
+  test("can omit the symbol", () => {
+    expect(formatAmount(482050, "XCD", { symbol: false })).toBe("4,820.50");
+  });
+});
+
+describe("splitAmount", () => {
+  test("splits into symbol, dollars, and cents for the hero card", () => {
+    expect(splitAmount(1_041_560, "XCD")).toEqual({
+      symbol: "EC$",
+      whole: "10,415",
+      fraction: ".60",
+    });
+  });
+
+  test("uses the magnitude, leaving direction to the caller", () => {
+    expect(splitAmount(-1_041_560, "XCD").whole).toBe("10,415");
+  });
+
+  test("reassembles into formatAmount's output", () => {
+    const parts = splitAmount(482050, "XCD");
+    expect(`${parts.symbol}${parts.whole}${parts.fraction}`).toBe(formatAmount(482050, "XCD"));
+  });
+});
+
+describe("formatRate", () => {
+  test("renders a rate line with both symbols", () => {
+    expect(formatRate("57.78000000", "XCD", "JMD")).toBe("1 EC$ = 57.78 J$");
+  });
+
+  test("pads rather than trims, so a peg reads 2.70 not 2.7", () => {
+    expect(formatRate("2.70000000", "USD", "XCD")).toBe("1 US$ = 2.70 EC$");
+    expect(formatRate("2", "USD", "XCD")).toBe("1 US$ = 2.00 EC$");
+  });
+
+  test("sub-unit rates keep enough decimals to stay useful", () => {
+    expect(formatRate("0.37037037", "XCD", "USD")).toBe("1 EC$ = 0.3703 US$");
+  });
+
+  test("groups large rates", () => {
+    expect(formatRate("1234.5", "USD", "JMD")).toBe("1 US$ = 1,234.50 J$");
+  });
+
+  test("never parses the rate as a float", () => {
+    // 8-dp rates are beyond float-safe territory; the digits must survive verbatim.
+    expect(formatRate("58.51851852", "XCD", "JMD", 8)).toBe("1 EC$ = 58.51851852 J$");
   });
 });

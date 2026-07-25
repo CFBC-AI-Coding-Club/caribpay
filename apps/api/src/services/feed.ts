@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { TransactionsPage } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
 import { transactions } from "../db/schema";
+import { resolveParties } from "./counterparties";
 import { toPublicTransaction } from "./transfers";
 
 // The "Regional transfers" feed is about money moving between people, so it
@@ -36,8 +37,9 @@ export async function listUserTransactions(
     .limit(limit + 1);
 
   const page = rows.slice(0, limit);
+  const parties = await resolveParties(dbh, userId, page);
   return {
-    items: page.map(toPublicTransaction),
+    items: page.map((row, i) => toPublicTransaction(row, parties[i]!)),
     nextCursor: rows.length > limit ? page[page.length - 1]!.id : null,
   };
 }

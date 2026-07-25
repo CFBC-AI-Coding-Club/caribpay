@@ -1,0 +1,1 @@
+ALTER TABLE "contacts" ADD COLUMN "pinned" boolean DEFAULT false NOT NULL;
