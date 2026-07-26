@@ -152,7 +152,8 @@ export default function SendReviewScreen() {
     if (!canSend) return;
     createTransfer.mutate(
       {
-        recipientAddress: recipient.address,
+        toKey: recipient.key,
+        sourceAccountId: draft.sourceAccountId!,
         sourceCurrency,
         destCurrency,
         sourceAmountMinor,
@@ -198,7 +199,7 @@ export default function SendReviewScreen() {
         {/* Recipient */}
         <View style={{ alignItems: "center", gap: 10, marginTop: needsReconfirm ? space.lg : 14 }}>
           <Avatar
-            name={recipient.displayName}
+            name={recipient.maskedName}
             size={needsReconfirm ? 60 : 66}
             country={recipient.countryCode}
             currency={destCurrency}
@@ -209,11 +210,11 @@ export default function SendReviewScreen() {
               Sending to
             </Txt>
             <Txt size={needsReconfirm ? 17 : 20} weight={800} numberOfLines={1}>
-              {recipient.displayName}
+              {recipient.maskedName}
             </Txt>
             {!needsReconfirm && (
               <Txt size={12} weight={500} color={color.inkMuted} tabular>
-                {recipient.address}
+                {recipient.primaryVpa}
               </Txt>
             )}
           </View>

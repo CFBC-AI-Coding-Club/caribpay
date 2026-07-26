@@ -13,7 +13,7 @@ import {
   Skeleton,
   Txt,
 } from "@/components/ui";
-import { useContacts, useLogout, useMe, useWallets } from "@/api/hooks";
+import { useAccounts, useContacts, useLogout, useMe } from "@/api/hooks";
 import { useAuthStore } from "@/stores/auth";
 
 function MenuItem({
@@ -73,13 +73,13 @@ function MenuItem({
 export default function MenuScreen() {
   const router = useRouter();
   const me = useMe();
-  const wallets = useWallets();
+  const accounts = useAccounts();
   const contacts = useContacts();
   const logout = useLogout();
   const sessionUser = useAuthStore((s) => s.user);
 
   const user = me.data?.user ?? sessionUser;
-  const walletCount = wallets.data?.wallets.length ?? 0;
+  const accountCount = accounts.data?.accounts.length ?? 0;
   const contactCount = contacts.data?.length ?? 0;
 
   function confirmLogout() {
@@ -141,9 +141,14 @@ export default function MenuScreen() {
               <MenuItem icon="user" label="Profile" onPress={() => router.push("/profile")} />
               <MenuItem
                 icon="card"
-                label="Wallets"
-                detail={`${walletCount} ${walletCount === 1 ? "currency" : "currencies"} open`}
-                onPress={() => router.push("/wallet/add")}
+                label="Bank accounts"
+                detail={`${accountCount} connected`}
+                onPress={() => router.push("/accounts")}
+              />
+              <MenuItem
+                icon="mail"
+                label="Your addresses"
+                onPress={() => router.push("/directory/keys")}
               />
               <MenuItem
                 icon="people"
@@ -160,6 +165,12 @@ export default function MenuScreen() {
             </RowGroup>
 
             <RowGroup paddingHorizontal={space.lg} style={{ borderRadius: radius.card }}>
+              <MenuItem
+                icon="shieldCheck"
+                label="Settlement positions"
+                detail="What each bank owes"
+                onPress={() => router.push("/settlement")}
+              />
               <MenuItem
                 icon="help"
                 label="Help & support"

@@ -92,13 +92,9 @@ export default function ScanScreen() {
     setHandled(true);
     resolve.mutate(data, {
       onSuccess: (resolved) => {
-        setRecipient({
-          address: resolved.walletAddress,
-          displayName: resolved.displayName,
-          countryCode: resolved.countryCode,
-          currency: resolved.currency,
-        });
-        router.replace("/send");
+        // The QR is signed, but the directory still gets the last word on who
+        // this address currently reaches — so the same confirm step as typing.
+        router.replace({ pathname: "/send/confirm", params: { key: resolved.vpa } });
       },
     });
   }

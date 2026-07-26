@@ -1,80 +1,77 @@
 import { useState } from "react";
 import { Image, Pressable, ScrollView, Share, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import QRCode from "react-native-qrcode-svg";
-import {
-  CURRENCY_NAMES,
-  CURRENCY_SYMBOLS,
-  SUPPORTED_CURRENCIES,
-  type Currency,
-} from "@caribpay/shared";
+import { CURRENCY_SYMBOLS } from "@caribpay/shared";
 import { color, radius, shadow, space } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/Flag";
 import {
   Button,
+  EmptyState,
   ErrorState,
   HomeIndicator,
   Loading,
-  PickerSheet,
   Screen,
   ScreenHeader,
   Txt,
 } from "@/components/ui";
-import { useQrReceive, useWallets } from "@/api/hooks";
+import { useQrReceive } from "@/api/hooks";
+import { useRouter } from "expo-router";
+import { ApiRequestError } from "@/api/client";
 
+/**
+ * Your address, large and copyable, with the signed QR beneath it.
+ *
+ * The address leads because it is the thing a person can say over a phone call —
+ * which is the whole reason for moving off `CW-…` identifiers. The QR is the
+ * same address, signed, for when the two phones are in the same room.
+ */
 export default function ReceiveScreen() {
-  const params = useLocalSearchParams<{ currency?: string }>();
-  const wallets = useWallets();
-  const [currency, setCurrency] = useState<Currency | undefined>(
-    params.currency as Currency | undefined,
-  );
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const router = useRouter();
+  const receive = useQrReceive();
   const [copied, setCopied] = useState(false);
-
-  const receive = useQrReceive(currency);
-  const owned = wallets.data?.wallets ?? [];
-
-  const options = SUPPORTED_CURRENCIES.filter((c) => owned.some((w) => w.currency === c)).map(
-    (c) => ({
-      value: c,
-      label: CURRENCY_NAMES[c],
-      detail: `Receive into your ${CURRENCY_SYMBOLS[c]} wallet`,
-      leading: <Flag currency={c} size={30} />,
-    }),
-  );
 
   async function copyAddress() {
     if (receive.data === undefined) return;
-    await Clipboard.setStringAsync(receive.data.walletAddress);
+    await Clipboard.setStringAsync(receive.data.vpa);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
   async function shareAddress() {
     if (receive.data === undefined) return;
-    const { displayName, walletAddress, currency: c } = receive.data;
+    const { displayName, vpa, currency } = receive.data;
     await Share.share({
-      message: `Pay ${displayName} on CaribPay\n${walletAddress} (${CURRENCY_SYMBOLS[c]})\nNo fees, no US dollar.`,
+      message: `Pay ${displayName} on CaribPay\n${vpa} (${CURRENCY_SYMBOLS[currency]})\nNo fees, no US dollar.`,
     }).catch(() => undefined);
   }
+
+  const notPayable =
+    receive.error instanceof ApiRequestError &&
+    (receive.error.code === "NO_LINKED_ACCOUNT" || receive.error.code === "NO_ADDRESS");
 
   return (
     <Screen edges={{ bottom: false }}>
       <ScreenHeader title="Receive money" />
 
-      {receive.isError ? (
+      {notPayable ? (
+        <EmptyState
+          icon="card"
+          title="Connect a bank account first"
+          body="Your CaribPay address needs an account to deliver money into. Connect one and your address starts working immediately."
+          actionLabel="Connect an account"
+          actionIcon="plus"
+          onAction={() => router.replace("/accounts/link")}
+        />
+      ) : receive.isError ? (
         <ErrorState
-          body="We couldn't build your QR code. Check your connection and try again."
+          body="We couldn't build your code. Check your connection and try again."
           onRetry={() => void receive.refetch()}
         />
       ) : receive.isPending || receive.data === undefined ? (
         <Loading label="Building your code…" />
       ) : (
-        // A ScrollView rather than a fixed column: the QR block and the two
-        // actions below it are taller than a small phone at large text sizes, and
-        // an unreachable "Copy address" is the whole point of this screen missed.
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
@@ -84,10 +81,7 @@ export default function ReceiveScreen() {
             paddingTop: 10,
           }}
         >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Change which wallet receives"
-            onPress={() => setPickerOpen(true)}
+          <View
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -101,14 +95,50 @@ export default function ReceiveScreen() {
               borderRadius: radius.pill,
             }}
           >
-            <Flag currency={receive.data.currency} size={24} />
+            <Flag currency={receive.data.currency} country={receive.data.countryCode} size={24} />
             <Txt size={13} weight={700}>
-              Into {CURRENCY_SYMBOLS[receive.data.currency]} wallet
+              Arrives as {CURRENCY_SYMBOLS[receive.data.currency]}
             </Txt>
-            <Icon name="chevronDown" size={14} color={color.inkMuted} strokeWidth={2.4} />
+          </View>
+
+          {/* The address leads: it is the part a person can say out loud. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Copy your address, ${receive.data.vpa}`}
+            onPress={() => void copyAddress()}
+            style={[
+              {
+                width: "100%",
+                marginTop: space.lg,
+                backgroundColor: color.surface,
+                borderRadius: radius.cardLg,
+                paddingHorizontal: space.lg,
+                paddingVertical: space.lg,
+                alignItems: "center",
+                gap: 6,
+              },
+              shadow.panel,
+            ]}
+          >
+            <Txt size={11} weight={600} color={color.inkMuted}>
+              YOUR CARIBPAY ADDRESS
+            </Txt>
+            <Txt size={24} weight={800} tabular align="center" numberOfLines={1} adjustsFontSizeToFit>
+              {receive.data.vpa}
+            </Txt>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+              <Icon
+                name={copied ? "check" : "copy"}
+                size={14}
+                color={copied ? color.success : color.link}
+                strokeWidth={2}
+              />
+              <Txt size={12} weight={700} color={copied ? color.success : color.link}>
+                {copied ? "Copied" : "Tap to copy"}
+              </Txt>
+            </View>
           </Pressable>
 
-          {/* The signed payload is what the scanner verifies — not the bare address. */}
           <View
             style={[
               {
@@ -117,13 +147,13 @@ export default function ReceiveScreen() {
                 borderRadius: radius.cardLg,
                 padding: 22,
               },
-              shadow.panel,
+              shadow.card,
             ]}
           >
-            <View style={{ width: 232, height: 232, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ width: 200, height: 200, alignItems: "center", justifyContent: "center" }}>
               <QRCode
                 value={receive.data.payload}
-                size={232}
+                size={200}
                 color={color.ink}
                 backgroundColor={color.surface}
                 ecl="Q"
@@ -131,9 +161,9 @@ export default function ReceiveScreen() {
               <View
                 style={{
                   position: "absolute",
-                  width: 52,
-                  height: 52,
-                  borderRadius: 15,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
                   backgroundColor: color.surface,
                   alignItems: "center",
                   justifyContent: "center",
@@ -144,68 +174,17 @@ export default function ReceiveScreen() {
                 <Image
                   accessibilityIgnoresInvertColors
                   source={require("../assets/logo-tile.png")}
-                  style={{ width: 42, height: 42, borderRadius: 12 }}
+                  style={{ width: 38, height: 38, borderRadius: 11 }}
                 />
               </View>
             </View>
           </View>
 
-          <View style={{ alignItems: "center", marginTop: space.lg }}>
-            <Txt size={17} weight={800} numberOfLines={1}>
-              {receive.data.displayName}
-            </Txt>
-            <Txt size={13} weight={500} color={color.inkMuted} style={{ marginTop: 4 }}>
-              Scan to pay me in {CURRENCY_SYMBOLS[receive.data.currency]} — no fees
-            </Txt>
-          </View>
+          <Txt size={13} weight={500} color={color.inkMuted} align="center" style={{ marginTop: space.md }}>
+            Scan to pay {receive.data.displayName} — no fees
+          </Txt>
 
-          <View
-            style={[
-              {
-                width: "100%",
-                marginTop: space.lg,
-                backgroundColor: color.surface,
-                borderRadius: radius.card,
-                paddingHorizontal: space.lg,
-                paddingVertical: space.md,
-              },
-              shadow.card,
-            ]}
-          >
-            <Txt size={11} weight={600} color={color.inkMuted}>
-              Your wallet address
-            </Txt>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 10,
-                marginTop: 6,
-              }}
-            >
-              <Txt size={15} weight={700} tabular style={{ flex: 1 }}>
-                {receive.data.walletAddress}
-              </Txt>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Copy wallet address"
-                onPress={() => void copyAddress()}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: radius.chip,
-                  backgroundColor: color.primarySoft,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon name={copied ? "check" : "copy"} size={17} color={color.link} strokeWidth={1.9} />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 10, marginTop: space.md, width: "100%" }}>
+          <View style={{ flexDirection: "row", gap: 10, marginTop: space.lg, width: "100%" }}>
             <Button
               label={copied ? "Copied" : "Copy"}
               icon={copied ? "check" : "copy"}
@@ -224,15 +203,6 @@ export default function ReceiveScreen() {
           </View>
         </ScrollView>
       )}
-
-      <PickerSheet
-        visible={pickerOpen}
-        title="Receive into"
-        options={options}
-        value={receive.data?.currency}
-        onSelect={setCurrency}
-        onClose={() => setPickerOpen(false)}
-      />
       <HomeIndicator />
     </Screen>
   );

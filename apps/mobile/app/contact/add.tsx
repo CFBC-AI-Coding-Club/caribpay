@@ -19,7 +19,7 @@ import {
   Toggle,
   Txt,
 } from "@/components/ui";
-import { useAddressLookup, useCreateContact } from "@/api/hooks";
+import { useResolveKey, useCreateContact } from "@/api/hooks";
 import { ApiRequestError } from "@/api/client";
 
 const MODES = [
@@ -36,14 +36,14 @@ export default function AddContactScreen() {
   const [nameEdited, setNameEdited] = useState(false);
   const [pinned, setPinned] = useState(true);
 
-  const normalized = address.trim().toUpperCase();
-  const lookup = useAddressLookup(normalized);
+  const normalized = address.trim();
+  const lookup = useResolveKey(normalized, normalized.length >= 3);
   const found = lookup.data;
 
   // Prefill the display name from the resolved account, but stop once the user
   // has typed their own — their label wins.
   useEffect(() => {
-    if (found !== undefined && !nameEdited) setDisplayName(found.displayName);
+    if (found !== undefined && !nameEdited) setDisplayName(found.maskedName);
   }, [found, nameEdited]);
 
   const canSave = found !== undefined && displayName.trim() !== "" && !createContact.isPending;
@@ -51,7 +51,7 @@ export default function AddContactScreen() {
   function save() {
     if (!canSave) return;
     createContact.mutate(
-      { walletAddress: found.walletAddress, displayName: displayName.trim(), pinned },
+      { key: found.key, displayName: displayName.trim(), pinned },
       { onSuccess: () => router.replace("/(tabs)/contacts") },
     );
   }
@@ -116,7 +116,7 @@ export default function AddContactScreen() {
             <>
               <Card style={{ paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: space.md }}>
                 <Avatar
-                  name={found.displayName}
+                  name={found.maskedName}
                   size={44}
                   country={found.countryCode}
                   currency={found.currency}
@@ -126,7 +126,7 @@ export default function AddContactScreen() {
                     Account found
                   </Txt>
                   <Txt size={15} weight={700} numberOfLines={1}>
-                    {found.displayName}
+                    {found.maskedName}
                   </Txt>
                   <Txt size={12} weight={500} color={color.inkMuted}>
                     {COUNTRY_NAMES[found.countryCode] ?? found.countryCode} ·{" "}

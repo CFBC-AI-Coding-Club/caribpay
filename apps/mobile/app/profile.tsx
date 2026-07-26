@@ -19,7 +19,7 @@ import {
   SheetScreen,
   Txt,
 } from "@/components/ui";
-import { useMe, useTransactions, useWallets } from "@/api/hooks";
+import { useAccounts, useDirectoryKeys, useMe, useTransactions } from "@/api/hooks";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -69,16 +69,18 @@ function StatCard({ value, label, tone }: { value: string; label: string; tone?:
 
 export default function ProfileScreen() {
   const me = useMe();
-  const wallets = useWallets();
+  const accounts = useAccounts();
+  const keys = useDirectoryKeys();
   const feed = useTransactions();
 
   const user = me.data?.user;
   const homeCurrency = user === undefined ? "XCD" : homeCurrencyFor(user.countryCode);
-  const homeWallet = wallets.data?.wallets.find((w) => w.currency === homeCurrency);
+  const primaryVpa = (keys.data ?? []).find((k) => k.type === "vpa" && k.isPrimary)?.value;
+  const accountCount = accounts.data?.accounts.length ?? 0;
 
   const sentCount = useMemo(
-    () => (feed.data ?? []).filter((tx) => tx.direction === "out").length,
-    [feed.data],
+    () => feed.items.filter((tx) => tx.direction === "out").length,
+    [feed.items],
   );
 
   const memberSince = useMemo(() => {
@@ -146,7 +148,8 @@ export default function ProfileScreen() {
               label="Home currency"
               value={`${CURRENCY_SYMBOLS[homeCurrency]} · ${homeCurrency}`}
             />
-            <InfoRow label="Wallet address" value={homeWallet?.address ?? "—"} last />
+            <InfoRow label="CaribPay address" value={primaryVpa ?? "—"} />
+            <InfoRow label="Bank accounts" value={`${accountCount} connected`} last />
           </RowGroup>
 
           <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>

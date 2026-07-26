@@ -22,15 +22,15 @@ function selfLabel(tx: Transaction): string {
 export function TransactionRow({
   transaction: tx,
   /**
-   * Set when the row appears inside one wallet's history: the amount then shows
-   * that wallet's exact ledger delta rather than either side of the transfer.
+   * Set when the row appears inside one account's history: the amount then shows
+   * that account's exact ledger delta rather than either side of the transfer.
    */
-  walletCurrency,
+  accountCurrency,
   divider = false,
   surface = color.surface,
 }: {
   transaction: Transaction;
-  walletCurrency?: Currency;
+  accountCurrency?: Currency;
   divider?: boolean;
   surface?: string;
 }) {
@@ -38,15 +38,15 @@ export function TransactionRow({
   const incoming = tx.direction === "in";
   const name = tx.counterparty?.displayName ?? selfLabel(tx);
 
-  // Wallet-scoped rows use the signed delta; feed rows show the leg that belongs
+  // Account-scoped rows use the signed delta; feed rows show the leg that belongs
   // to the viewer — what they sent, or what they received.
-  const scoped = walletCurrency !== undefined && tx.walletDeltaMinor !== undefined;
+  const scoped = accountCurrency !== undefined && tx.walletDeltaMinor !== undefined;
   const amountMinor = scoped
     ? tx.walletDeltaMinor!
     : incoming
       ? tx.destAmountMinor
       : -tx.sourceAmountMinor;
-  const currency = scoped ? walletCurrency! : incoming ? tx.destCurrency : tx.sourceCurrency;
+  const currency = scoped ? accountCurrency! : incoming ? tx.destCurrency : tx.sourceCurrency;
 
   const failed = tx.status === "failed";
   const credit = amountMinor > 0;
@@ -103,7 +103,7 @@ export function TransactionRow({
           <Txt size={15} weight={700} color={amountColor} tabular>
             {formatAmount(amountMinor, currency, { sign: "always" })}
           </Txt>
-          {tx.status !== "settled" && <StatusBadge status={tx.status} />}
+          {tx.status !== "completed" && <StatusBadge status={tx.status} />}
         </View>
       }
     />

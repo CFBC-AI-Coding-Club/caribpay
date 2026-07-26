@@ -37,7 +37,7 @@ function DetailRow({ label, value, tone }: { label: string; value: string; tone?
 }
 
 function timelineSteps(tx: Transaction): Step[] {
-  const terminal = tx.status === "settled" || tx.status === "failed";
+  const terminal = tx.status === "completed" || tx.status === "failed";
   const settledAt = tx.settledAt === null ? undefined : dateTimeLabel(tx.settledAt);
   return [
     { label: "Initiated", detail: dateTimeLabel(tx.createdAt), state: "done" },
@@ -51,7 +51,7 @@ function timelineSteps(tx: Transaction): Step[] {
       : {
           label: "Settled",
           detail: settledAt,
-          state: tx.status === "settled" ? "done" : "upcoming",
+          state: tx.status === "completed" ? "done" : "upcoming",
         },
   ];
 }
@@ -110,15 +110,12 @@ export default function TransactionDetailScreen() {
   }
 
   function sendAgain() {
-    if (tx.counterparty === null) return;
+    const vpa = tx.counterparty?.vpa;
+    if (vpa === undefined || vpa === null) return;
     reset();
-    setRecipient({
-      address: tx.counterparty.walletAddress,
-      displayName: tx.counterparty.displayName,
-      countryCode: tx.counterparty.countryCode,
-      currency: tx.destCurrency,
-    });
-    router.push("/send");
+    // Back through confirmation: their address may now reach a different
+    // account, and a receipt is not a substitute for asking the directory.
+    router.push({ pathname: "/send/confirm", params: { key: vpa } });
   }
 
   return (
@@ -192,7 +189,7 @@ export default function TransactionDetailScreen() {
             }
           />
           {tx.counterparty !== null && (
-            <DetailRow label="Counterparty" value={tx.counterparty.walletAddress} />
+            <DetailRow label="Counterparty" value={tx.counterparty.vpa ?? tx.counterparty.displayName} />
           )}
           {tx.failureReason !== null && (
             <DetailRow label="Failure" value={tx.failureReason} tone={color.errorText} />

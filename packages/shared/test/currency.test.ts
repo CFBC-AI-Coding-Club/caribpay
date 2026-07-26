@@ -5,6 +5,7 @@ import {
   formatMoney,
   formatRate,
   fromMinor,
+  groupDigits,
   splitAmount,
   toMinor,
 } from "../src/currency";
@@ -195,5 +196,27 @@ describe("formatRate", () => {
   test("never parses the rate as a float", () => {
     // 8-dp rates are beyond float-safe territory; the digits must survive verbatim.
     expect(formatRate("58.51851852", "XCD", "JMD", 8)).toBe("1 EC$ = 58.51851852 J$");
+  });
+});
+
+describe("groupDigits", () => {
+  test("groups a typed amount as it is entered", () => {
+    expect(groupDigits("25000")).toBe("25,000");
+    expect(groupDigits("1500")).toBe("1,500");
+    expect(groupDigits("250")).toBe("250");
+    expect(groupDigits("0")).toBe("0");
+  });
+
+  test("preserves a trailing decimal point mid-keystroke", () => {
+    expect(groupDigits("25000.")).toBe("25,000.");
+  });
+
+  test("keeps partial cents exactly as typed", () => {
+    expect(groupDigits("25000.5")).toBe("25,000.5");
+    expect(groupDigits("25000.50")).toBe("25,000.50");
+  });
+
+  test("matches formatAmount's grouping, so the figure does not change on review", () => {
+    expect(`EC$${groupDigits("25000.50")}`).toBe(formatAmount(2500050, "XCD"));
   });
 });
