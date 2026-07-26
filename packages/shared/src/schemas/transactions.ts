@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { SUPPORTED_CURRENCIES, TRANSACTION_STATUSES, TRANSACTION_TYPES } from "../constants";
+import { SUPPORTED_CURRENCIES, TRANSACTION_TYPES, TRANSFER_LIFECYCLE_STATUSES } from "../constants";
 
 /**
  * Display identity of the other party to a transfer, resolved for the
  * requesting user: their saved contact name if they have one, otherwise the
- * counterparty's own name. The address is the counterparty's wallet in *that
- * leg's* currency, which is what the UI shows next to their name.
+ * counterparty's own masked name.
  */
 export const counterpartySchema = z.object({
   displayName: z.string(),
-  walletAddress: z.string(),
+  /** Their primary VPA — the address a user can actually read and repeat. */
+  vpa: z.string().nullable(),
   countryCode: z.string().length(2),
 });
 export type Counterparty = z.infer<typeof counterpartySchema>;
@@ -21,7 +21,7 @@ export type TransferDirection = (typeof TRANSFER_DIRECTIONS)[number];
 export const transactionSchema = z.object({
   id: z.uuid(),
   type: z.enum(TRANSACTION_TYPES),
-  status: z.enum(TRANSACTION_STATUSES),
+  status: z.enum(TRANSFER_LIFECYCLE_STATUSES),
   sourceCurrency: z.enum(SUPPORTED_CURRENCIES),
   destCurrency: z.enum(SUPPORTED_CURRENCIES),
   sourceAmountMinor: z.number().int().positive(),
@@ -35,6 +35,9 @@ export const transactionSchema = z.object({
   createdAt: z.string(),
   /** Net effect on the wallet the feed was scoped to; absent in unscoped feeds. */
   walletDeltaMinor: z.number().int().optional(),
+  /** What the payer typed, and the name shown at confirmation. Snapshots. */
+  recipientKeyUsed: z.string().nullable(),
+  recipientNameSnapshot: z.string().nullable(),
   /** Whether the requesting user sent or received this. */
   direction: z.enum(TRANSFER_DIRECTIONS),
   /** Null when the user is both parties, or the other side is a system movement. */

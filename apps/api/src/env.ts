@@ -16,6 +16,13 @@ export const env = {
       ? null
       : intFromEnv(process.env.MOCK_SETTLEMENT_DELAY_MS, 3000),
   mockSettlementFailures: process.env.MOCK_SETTLEMENT_FAILURES === "true",
+  /** The mock member-bank service. The only route to customer accounts. */
+  bankBaseUrl: process.env.BANK_BASE_URL ?? "http://localhost:3100",
+  /**
+   * How long to wait for a bank. Past this the outcome is unknown, which is a
+   * different thing from a failure — see BankUnknownError.
+   */
+  bankTimeoutMs: intFromEnv(process.env.BANK_TIMEOUT_MS, 10000),
   /** Dev runs the settlement worker inside the api process; pm2 runs it separately. */
   workerInProcess: process.env.WORKER_IN_PROCESS !== "false",
 };

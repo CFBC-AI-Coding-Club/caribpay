@@ -1,23 +1,31 @@
 import { z } from "zod";
-import { SUPPORTED_CURRENCIES, WALLET_ADDRESS_PATTERN } from "../constants";
+import { SUPPORTED_CURRENCIES } from "../constants";
 
+/**
+ * A saved counterparty.
+ *
+ * `savedKey` is what the owner typed when they saved them, kept for the receipt
+ * trail. `primaryVpa` is resolved live from the directory, so a contact keeps
+ * working after its owner changes their handle — the durable link is the user,
+ * not the address.
+ */
 export const contactSchema = z.object({
   id: z.uuid(),
   contactUserId: z.uuid(),
-  walletAddress: z.string().regex(WALLET_ADDRESS_PATTERN),
+  savedKey: z.string(),
+  primaryVpa: z.string().nullable(),
   displayName: z.string(),
-  /** Currency of the saved wallet — drives the "· TT$" suffix on contact rows. */
-  currency: z.enum(SUPPORTED_CURRENCIES),
-  /** Contact's country, for the flag badge on their avatar. */
+  /** Currency of the account their primary key routes to. */
+  currency: z.enum(SUPPORTED_CURRENCIES).nullable(),
   countryCode: z.string().length(2),
-  /** Shown in the Contacts screen's "Quick send" row. */
   pinned: z.boolean(),
   createdAt: z.string(),
 });
 export type Contact = z.infer<typeof contactSchema>;
 
 export const createContactRequestSchema = z.object({
-  walletAddress: z.string().regex(WALLET_ADDRESS_PATTERN, "Not a valid wallet address"),
+  /** A VPA, phone, or email. Resolved before the contact is saved. */
+  key: z.string().trim().min(3).max(254),
   displayName: z.string().trim().min(1).max(80),
   pinned: z.boolean().default(false),
 });

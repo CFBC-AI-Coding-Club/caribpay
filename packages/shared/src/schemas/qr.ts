@@ -1,12 +1,19 @@
 import { z } from "zod";
-import { SUPPORTED_CURRENCIES, WALLET_ADDRESS_PATTERN } from "../constants";
+import { SUPPORTED_CURRENCIES } from "../constants";
 
-// The QR payload is the full `caribpay://pay?...` URI the app encodes into the
-// QR image. `payload` round-trips to /qr/resolve to verify the signature.
+/**
+ * The signed `caribpay://pay?...` payload a receiver's screen encodes.
+ *
+ * It carries a VPA rather than an account reference: a QR is shown in public and
+ * photographed, and the directory is the only thing that should be able to turn
+ * an address into an account. The name is the *masked* one, so scanning and
+ * resolving agree about who you are paying.
+ */
 export const qrReceiveResponseSchema = z.object({
-  walletAddress: z.string().regex(WALLET_ADDRESS_PATTERN),
+  vpa: z.string(),
   currency: z.enum(SUPPORTED_CURRENCIES),
   displayName: z.string(),
+  countryCode: z.string().length(2),
   payload: z.string(),
 });
 export type QrReceiveResponse = z.infer<typeof qrReceiveResponseSchema>;
@@ -17,7 +24,7 @@ export const qrResolveQuerySchema = z.object({
 export type QrResolveQuery = z.infer<typeof qrResolveQuerySchema>;
 
 export const qrResolveResponseSchema = z.object({
-  walletAddress: z.string().regex(WALLET_ADDRESS_PATTERN),
+  vpa: z.string(),
   currency: z.enum(SUPPORTED_CURRENCIES),
   displayName: z.string(),
   /** Covered by the signature, so it cannot be swapped for another country. */
