@@ -44,7 +44,6 @@ export async function listInstitutions(dbh: DbHandle): Promise<Institution[]> {
     pspHandle: row.pspHandle,
     pspStatus: row.pspStatus,
     supportsAccountLinking: row.supportsAccountLinking,
-    isSimulated: row.isSimulated,
     sortOrder: row.sortOrder,
   }));
 }

@@ -25,6 +25,7 @@ import {
   Txt,
 } from "@/components/ui";
 import { useContacts, useResolveKey } from "@/api/hooks";
+import { useGoBack } from "@/lib/nav";
 import { asPayable, useDraftStore } from "@/stores/draft";
 import { ApiRequestError } from "@/api/client";
 import { shortDate } from "@/lib/datetime";
@@ -43,6 +44,7 @@ import { shortDate } from "@/lib/datetime";
  */
 export default function SendConfirmScreen() {
   const router = useRouter();
+  const goBack = useGoBack("/send");
   const { key } = useLocalSearchParams<{ key: string }>();
   const setRecipient = useDraftStore((s) => s.setRecipient);
   const contacts = useContacts();
@@ -74,7 +76,7 @@ export default function SendConfirmScreen() {
               ? error.message
               : "Check your connection and try again."
           }
-          onRetry={() => router.back()}
+          onRetry={goBack}
         />
       </Screen>
     );
@@ -156,7 +158,7 @@ export default function SendConfirmScreen() {
 
       <View style={{ paddingHorizontal: space.gutter, paddingTop: space.md, gap: 10 }}>
         <Button label="Yes, that's them" icon="checkWide" onPress={proceed} />
-        <Button label="Someone else" variant="secondary" height={48} onPress={() => router.back()} />
+        <Button label="Someone else" variant="secondary" height={48} onPress={goBack} />
       </View>
       <HomeIndicator />
     </Screen>
@@ -173,6 +175,7 @@ export default function SendConfirmScreen() {
  */
 function NotPayable({ payee }: { payee: ResolveResponse }) {
   const router = useRouter();
+  const goBack = useGoBack("/send");
   const first = payee.maskedName.split(" ")[0] ?? "They";
 
   return (
@@ -231,7 +234,7 @@ function NotPayable({ payee }: { payee: ResolveResponse }) {
       </ScrollView>
 
       <View style={{ paddingHorizontal: space.gutter, paddingTop: space.md, gap: 10 }}>
-        <Button label="Choose someone else" onPress={() => router.back()} />
+        <Button label="Choose someone else" onPress={goBack} />
         <Button
           label="Save them for later"
           variant="secondary"
@@ -255,6 +258,7 @@ function NotPayable({ payee }: { payee: ResolveResponse }) {
  */
 function NotFound({ typed, contacts }: { typed: string; contacts: Contact[] }) {
   const router = useRouter();
+  const goBack = useGoBack("/send");
   const target = vpaSkeleton(typed.split("@")[0] ?? typed);
 
   const suggestion = contacts.find((c) => {
@@ -332,7 +336,7 @@ function NotFound({ typed, contacts }: { typed: string; contacts: Contact[] }) {
       </ScrollView>
 
       <View style={{ paddingHorizontal: space.gutter, paddingTop: space.md, gap: 10 }}>
-        <Button label="Edit the address" onPress={() => router.back()} />
+        <Button label="Edit the address" onPress={goBack} />
         <Button
           label="Scan their QR instead"
           variant="secondary"

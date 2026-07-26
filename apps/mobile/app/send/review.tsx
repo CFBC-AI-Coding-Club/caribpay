@@ -27,6 +27,7 @@ import { useCreateTransfer, useFxQuote } from "@/api/hooks";
 import { useDraftStore, type DraftRecipient } from "@/stores/draft";
 import { ApiRequestError, ApiUnreachableError } from "@/api/client";
 import { countdownLabel, secondsUntil, timeLabel } from "@/lib/datetime";
+import { useGoBack } from "@/lib/nav";
 
 /**
  * Two different truths, and blurring them is the worst thing this flow can do.
@@ -409,6 +410,7 @@ export default function SendReviewScreen() {
   const reset = useDraftStore((s) => s.reset);
   const setQuote = useDraftStore((s) => s.setQuote);
   const createTransfer = useCreateTransfer();
+  const goBack = useGoBack("/send/amount");
 
   const recipient = draft.recipient;
   const sourceCurrency = draft.sourceCurrency;
@@ -695,7 +697,7 @@ export default function SendReviewScreen() {
           height={needsReconfirm ? 52 : 48}
           onPress={() => {
             setQuote(null);
-            router.back();
+            goBack();
           }}
         />
       </View>

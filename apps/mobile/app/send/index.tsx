@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { useAccounts, useContacts } from "@/api/hooks";
 import { useDraftStore } from "@/stores/draft";
+import { useGoBack } from "@/lib/nav";
 
 type Mode = "contact" | "address";
 
@@ -39,6 +40,7 @@ const MODES = [
  */
 export default function SendRecipientScreen() {
   const router = useRouter();
+  const goBack = useGoBack();
   const accounts = useAccounts();
   const contacts = useContacts();
   const reset = useDraftStore((s) => s.reset);
@@ -81,7 +83,7 @@ export default function SendRecipientScreen() {
             icon="plus"
             onPress={() => router.replace("/accounts/link")}
           />
-          <Button label="Not now" variant="ghost" height={48} onPress={() => router.back()} />
+          <Button label="Not now" variant="ghost" height={48} onPress={goBack} />
         </View>
         <HomeIndicator />
       </Screen>

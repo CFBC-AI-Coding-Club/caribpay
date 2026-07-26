@@ -85,7 +85,8 @@ export const refreshTokens = pgTable("refresh_tokens", {
  * Member institutions. One table serves both the suffix of a VPA and the
  * account-linking picker, because an institution is both.
  *
- * Every row is simulated; see `packages/shared/src/institutions-data.ts`.
+ * Seeded from `packages/shared/src/institutions-data.ts`, the single list both
+ * services read.
  */
 export const institutions = pgTable(
   "institutions",
@@ -99,8 +100,6 @@ export const institutions = pgTable(
     pspHandle: text("psp_handle").unique(),
     pspStatus: pspStatusEnum("psp_status").notNull().default("planned"),
     supportsAccountLinking: boolean("supports_account_linking").notNull().default(true),
-    /** Always true this phase. On the row so no screen can forget to say it. */
-    isSimulated: boolean("is_simulated").notNull().default(true),
     /** Handles someone would try in order to impersonate this institution. */
     reservedAliases: text("reserved_aliases").array().notNull().default(sql`'{}'::text[]`),
     sortOrder: integer("sort_order").notNull().default(0),

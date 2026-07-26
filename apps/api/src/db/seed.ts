@@ -51,7 +51,6 @@ export async function seedInstitutions(dbh: DbHandle): Promise<number> {
     pspHandle: seed.pspHandle,
     pspStatus: seed.pspStatus,
     supportsAccountLinking: seed.supportsAccountLinking,
-    isSimulated: true,
     reservedAliases: [...seed.reservedAliases],
     sortOrder: index,
   }));

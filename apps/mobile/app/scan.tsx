@@ -14,6 +14,7 @@ import {
   Txt,
 } from "@/components/ui";
 import { useResolveQr } from "@/api/hooks";
+import { useGoBack } from "@/lib/nav";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 
 /** Sweeping line inside the reticle while the camera is live. */
@@ -76,6 +77,7 @@ function Reticle({ tint }: { tint: string }) {
 
 export default function ScanScreen() {
   const router = useRouter();
+  const goBack = useGoBack("/send");
   // Scanning is reachable from Send and from Add contact. Without knowing which,
   // a scan started while adding a contact would silently drop you into the send
   // flow with no contact saved.
@@ -154,7 +156,7 @@ export default function ScanScreen() {
         title="Scan to pay"
         onDark
         backIcon="close"
-        onBack={() => router.back()}
+        onBack={goBack}
         trailing={
           failed ? undefined : (
             <IconButton

@@ -113,7 +113,7 @@ All tables get `id` (uuid), `created_at`, `updated_at` unless noted.
 
 **users** — email, password_hash, full_name, country_code, kyc_status.
 
-**institutions** — the member banks. `legal_name`, `display_name`, `country_code`, `currency`, `psp_handle` (unique, the `@suffix`), `psp_status` (`active | planned`), `supports_account_linking`, `is_simulated`, `reserved_aliases[]`, `sort_order`. Seeded from `packages/shared/institutions-data.ts`, the single list both services read.
+**institutions** — the member banks. `legal_name`, `display_name`, `country_code`, `currency`, `psp_handle` (unique, the `@suffix`), `psp_status` (`active | planned`), `supports_account_linking`, `reserved_aliases[]`, `sort_order`. Seeded from `packages/shared/institutions-data.ts`, the single list both services read.
 
 **linked_accounts** — `user_id`, `institution_id`, `account_ref`, `account_number_masked`, `currency`, `holder_name_verified`, `is_default`, `status`. **No balance column, ever.**
 

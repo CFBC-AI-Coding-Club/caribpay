@@ -3,8 +3,9 @@ import { Platform, View, type StyleProp, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useRouter } from "expo-router";
+import type { Href } from "expo-router";
 import { color, deepGradient, radius, space, useLayout } from "@/theme";
+import { useGoBack } from "@/lib/nav";
 import { IconButton } from "./Button";
 import { Txt } from "./Txt";
 
@@ -69,17 +70,20 @@ export function Screen({
 export function ScreenHeader({
   title,
   onBack,
+  backFallback,
   backIcon = "chevronLeft",
   trailing,
   onDark = false,
 }: {
   title?: string;
   onBack?: (() => void) | false;
+  /** Where the default back button lands when there is no history. */
+  backFallback?: Href;
   backIcon?: "chevronLeft" | "close";
   trailing?: ReactNode;
   onDark?: boolean;
 }) {
-  const router = useRouter();
+  const goBack = useGoBack(backFallback);
   const showBack = onBack !== false;
   const fg = onDark ? color.onDark : color.ink;
 
@@ -98,7 +102,7 @@ export function ScreenHeader({
         <IconButton
           icon={backIcon}
           accessibilityLabel="Go back"
-          onPress={onBack === undefined ? () => router.back() : onBack}
+          onPress={onBack === undefined ? goBack : onBack}
           color={fg}
           background={onDark ? color.onDarkFill : color.surface}
           elevated={!onDark}
