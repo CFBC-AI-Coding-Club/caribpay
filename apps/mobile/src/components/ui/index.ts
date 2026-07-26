@@ -11,3 +11,4 @@ export * from "./Screen";
 export * from "./States";
 export * from "./Timeline";
 export * from "./Txt";
+export * from "./SimulatedNotice";

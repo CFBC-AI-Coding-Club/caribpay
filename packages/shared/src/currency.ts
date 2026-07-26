@@ -88,6 +88,22 @@ function group(digits: string): string {
   return out;
 }
 
+/**
+ * Group a partially-typed decimal string as it is entered: "25000" → "25,000",
+ * "25000.5" → "25,000.5", and a trailing "." is preserved so the separator does
+ * not vanish mid-keystroke.
+ *
+ * The amount a payer is checking should read the same while typing as it will on
+ * the review screen; an ungrouped figure is where an order-of-magnitude slip
+ * hides.
+ */
+export function groupDigits(typed: string): string {
+  const [whole = "", frac] = typed.split(".");
+  const grouped = group(whole === "" ? "0" : whole);
+  if (frac === undefined) return typed.endsWith(".") ? `${grouped}.` : grouped;
+  return `${grouped}.${frac}`;
+}
+
 export interface FormatAmountOptions {
   /** Prefix the currency symbol (e.g. "EC$1,500.50"). Default true. */
   symbol?: boolean;

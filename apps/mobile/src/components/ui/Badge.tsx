@@ -69,17 +69,35 @@ interface StatusSkin {
   icon: IconName;
 }
 
-/** How each ledger status is presented. `initiated` is still "in flight" to a user. */
+/**
+ * Eight internal states, three the payer needs.
+ *
+ * The saga distinguishes where a conversation with two banks has reached; a
+ * person only needs to know whether their money is on its way, has arrived, or
+ * came back. The raw state stays visible on the transaction detail screen for
+ * anyone who asks.
+ */
 export function statusSkin(status: TransactionStatus): StatusSkin {
   switch (status) {
-    case "settled":
-      return { label: "Settled", tone: "success", icon: "check" };
+    case "completed":
+      return { label: "Delivered", tone: "success", icon: "check" };
     case "failed":
-      return { label: "Failed", tone: "error", icon: "close" };
-    case "pending_settlement":
+      return { label: "Not sent", tone: "error", icon: "close" };
+    case "reversed":
+      return { label: "Returned", tone: "error", icon: "close" };
+    case "reversal_pending":
+      return { label: "Returning", tone: "pending", icon: "clock" };
     case "initiated":
-      return { label: "Pending", tone: "pending", icon: "clock" };
+    case "debit_pending":
+    case "debit_held":
+    case "credit_pending":
+      return { label: "Sending", tone: "pending", icon: "clock" };
   }
+}
+
+/** True once nothing further will happen — stops the detail screen polling. */
+export function isTerminalStatus(status: TransactionStatus): boolean {
+  return status === "completed" || status === "failed" || status === "reversed";
 }
 
 export function StatusBadge({ status, size = 11 }: { status: TransactionStatus; size?: number }) {

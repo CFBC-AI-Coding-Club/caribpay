@@ -38,7 +38,7 @@ export class ApiUnreachableError extends Error {
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export interface RequestOptions<T> {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "DELETE";
   body?: unknown;
   /** Zod schema the successful response body is parsed with. Omit for 204. */
   schema?: z.ZodType<T>;

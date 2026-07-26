@@ -8,6 +8,7 @@
  * Account references are deterministic (`<HANDLE>-<slot>-<check>`) so the API's
  * demo seed can link to them without the two databases coordinating at run time.
  */
+import { eq } from "drizzle-orm";
 import { LINKABLE_INSTITUTION_SEEDS, toMinor, type Currency } from "@caribpay/shared";
 import type { DbHandle } from "./client";
 import { accounts } from "./schema";
@@ -81,6 +82,21 @@ export const DEMO_ACCOUNTS: DemoAccountSpec[] = [
   },
 ];
 
+/**
+ * Restore every demo account to its opening balance.
+ *
+ * Without this a second demo run starts from wherever the last one finished,
+ * which is exactly the kind of thing that gets discovered on stage.
+ */
+export async function resetDemoAccounts(dbh: DbHandle): Promise<void> {
+  for (const spec of DEMO_ACCOUNTS) {
+    await dbh
+      .update(accounts)
+      .set({ balanceMinor: toMinor(String(spec.openingMajor), spec.currency) })
+      .where(eq(accounts.accountRef, spec.accountRef));
+  }
+}
+
 export async function seedDemoAccounts(dbh: DbHandle): Promise<number> {
   const rows = DEMO_ACCOUNTS.map((spec) => ({
     accountRef: spec.accountRef,
@@ -98,7 +114,10 @@ if (import.meta.main) {
   const { db, sqlClient } = await import("./client");
   const linkable = LINKABLE_INSTITUTION_SEEDS.length;
   const count = await seedDemoAccounts(db);
-  console.log(`seeded ${count} account(s) across ${linkable} simulated institution(s)`);
+  // Holds and movements from a previous run would otherwise carry forward.
+  await sqlClient`TRUNCATE holds, debits, credits, bank_idempotency_records RESTART IDENTITY CASCADE`;
+  await resetDemoAccounts(db);
+  console.log(`seeded ${count} account(s) across ${linkable} simulated institution(s); balances reset`);
   await sqlClient.end();
   process.exit(0);
 }

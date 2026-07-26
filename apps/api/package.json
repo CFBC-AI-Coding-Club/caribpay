@@ -10,7 +10,8 @@
     "db:migrate": "bun src/db/migrate.ts",
     "db:seed": "bun src/db/seed.ts",
     "db:seed:demo": "bun src/db/seed-demo.ts",
-    "reconcile": "bun src/db/reconcile.ts"
+    "reconcile": "bun src/db/reconcile.ts",
+    "settle": "bun src/settlement/netting.ts"
   },
   "dependencies": {
     "@caribpay/shared": "workspace:*",

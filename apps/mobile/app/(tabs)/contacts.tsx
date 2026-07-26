@@ -35,13 +35,12 @@ function QuickSend({ contacts }: { contacts: Contact[] }) {
 
   function send(contact: Contact) {
     reset();
-    setRecipient({
-      address: contact.walletAddress,
-      displayName: contact.displayName,
-      countryCode: contact.countryCode,
-      currency: contact.currency,
+    // Straight to confirmation, so the directory — not a row saved months ago —
+    // decides who this key currently reaches.
+    router.push({
+      pathname: "/send/confirm",
+      params: { key: contact.primaryVpa ?? contact.savedKey },
     });
-    router.push("/send");
   }
 
   return (
@@ -68,7 +67,7 @@ function QuickSend({ contacts }: { contacts: Contact[] }) {
               name={contact.displayName}
               size={56}
               country={contact.countryCode}
-              currency={contact.currency}
+              currency={contact.currency ?? undefined}
               badgeBackground={color.bg}
             />
             <Txt size={12} weight={600} color={color.inkOnTint} numberOfLines={1} align="center">
@@ -122,7 +121,7 @@ export default function ContactsScreen() {
     return all.filter(
       (c) =>
         c.displayName.toLowerCase().includes(needle) ||
-        c.walletAddress.toLowerCase().includes(needle),
+        (c.primaryVpa ?? c.savedKey).toLowerCase().includes(needle),
     );
   }, [all, search]);
 
@@ -130,13 +129,12 @@ export default function ContactsScreen() {
 
   function send(contact: Contact) {
     reset();
-    setRecipient({
-      address: contact.walletAddress,
-      displayName: contact.displayName,
-      countryCode: contact.countryCode,
-      currency: contact.currency,
+    // Straight to confirmation, so the directory — not a row saved months ago —
+    // decides who this key currently reaches.
+    router.push({
+      pathname: "/send/confirm",
+      params: { key: contact.primaryVpa ?? contact.savedKey },
     });
-    router.push("/send");
   }
 
   return (
@@ -251,11 +249,15 @@ export default function ContactsScreen() {
                     name={contact.displayName}
                     size={AVATAR_SIZE}
                     country={contact.countryCode}
-                    currency={contact.currency}
+                    currency={contact.currency ?? undefined}
                   />
                 }
                 title={contact.displayName}
-                subtitle={`${contact.walletAddress} · ${CURRENCY_SYMBOLS[contact.currency]}`}
+                subtitle={
+                  contact.currency === null
+                    ? `${contact.primaryVpa ?? contact.savedKey} · no bank connected yet`
+                    : `${contact.primaryVpa ?? contact.savedKey} · ${CURRENCY_SYMBOLS[contact.currency]}`
+                }
                 trailing={
                   <Pressable
                     accessibilityRole="button"

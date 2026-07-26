@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { TransactionRow } from "@/components/TransactionRow";
 import { useTransactions } from "@/api/hooks";
+import { isTerminalStatus } from "@/components/ui/Badge";
 import { dayGroupLabel } from "@/lib/datetime";
 
 type Filter = "all" | "sent" | "received" | "pending";
@@ -36,7 +37,7 @@ function matches(tx: Transaction, filter: Filter): boolean {
     case "received":
       return tx.direction === "in";
     case "pending":
-      return tx.status === "initiated" || tx.status === "pending_settlement";
+      return !isTerminalStatus(tx.status);
   }
 }
 
@@ -57,7 +58,7 @@ export default function ActivityScreen() {
   const feed = useTransactions();
   const [filter, setFilter] = useState<Filter>("all");
 
-  const all = feed.data ?? [];
+  const all = feed.items;
   const visible = useMemo(() => all.filter((tx) => matches(tx, filter)), [all, filter]);
   const groups = useMemo(() => groupByDay(visible), [visible]);
 
@@ -69,8 +70,8 @@ export default function ActivityScreen() {
         </Txt>
         <Txt size={13} weight={500} color={color.inkMuted} style={{ marginTop: 2 }}>
           {feed.isPending
-            ? "All wallets"
-            : `All wallets · ${all.length} movement${all.length === 1 ? "" : "s"}`}
+            ? "Across your accounts"
+            : `Across your accounts · ${all.length} movement${all.length === 1 ? "" : "s"}`}
         </Txt>
       </View>
 

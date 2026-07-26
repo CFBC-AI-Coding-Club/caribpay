@@ -1,11 +1,6 @@
-// Standalone settlement worker entry for production (pm2: caribpay-worker).
-import { createSettlementWorker } from "./settlement";
+import { createTransferWorker } from "./transfer";
+import { startRecoverySweeper } from "./recovery";
 
-const worker = createSettlementWorker();
-console.log("caribpay settlement worker started");
-
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    void worker.close().then(() => process.exit(0));
-  });
-}
+createTransferWorker();
+startRecoverySweeper();
+console.log("caribpay transfer worker + recovery sweeper running");

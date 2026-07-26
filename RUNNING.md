@@ -40,10 +40,15 @@ Then wait ~30 s for the containers to report `(healthy)` before retrying whateve
 ```powershell
 bun install
 docker compose up -d
-bun run db:migrate
-bun run db:seed
-bun run db:seed:demo
+bun run db:migrate            # the switch
+bun run db:migrate:bank       # the member banks
+bun run db:seed:demo -- --reset
+bun run db:seed:bank
 ```
+
+Two databases, on purpose: `caribpay` is the switch, `caribpay_bank` is the simulated member
+banks. The switch has no credentials for the bank database — that boundary is what makes
+"CaribPay holds no customer money" inspectable rather than asserted.
 
 Config is committed at `apps/api/.env` — Postgres URL, Redis on **6380**, JWT and QR
 secrets, mock-settlement knobs. Nothing to fill in. Port 6380 is deliberate: your own native
@@ -51,7 +56,7 @@ WSL Redis owns 6379 and must not be touched.
 
 ---
 
-## Every session — three terminals
+## Every session — four terminals
 
 **1. Containers** (PowerShell)
 
@@ -61,14 +66,23 @@ docker compose up -d
 docker ps                              # wait for both (healthy), ~20s
 ```
 
-**2. API + settlement worker** (PowerShell)
+**2. Simulated member banks** (PowerShell)
+
+```powershell
+bun run dev:bank                       # :3100
+curl.exe -s http://localhost:3100/health
+```
+
+Start this **before** the API: the switch calls it for every balance read and every transfer.
+
+**3. The switch + workers** (PowerShell)
 
 ```powershell
 bun run dev:api
 ```
 
-The settlement worker runs in-process by default, so this is the whole backend. Gate on this
-before moving on:
+The transfer worker and the recovery sweeper run in-process by default, so this is the rest of
+the backend. Gate on this before moving on:
 
 ```powershell
 curl.exe -s http://localhost:3000/api/v1/health
@@ -78,7 +92,7 @@ curl.exe -s http://localhost:3000/api/v1/health
 `"db":"down"` right after boot ⇒ containers still starting. `"db":"down"` persistently ⇒
 check the keepalive.
 
-**3. Metro** (PowerShell)
+**4. Metro** (PowerShell)
 
 ```powershell
 bun run dev:mobile
@@ -111,8 +125,8 @@ WSL:
 wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin/bun test"
 ```
 
-Everything else — the API server, `db:migrate`, `db:seed`, `db:seed:demo`, `reconcile` —
-works fine on Windows *provided WSL is being kept alive*. Earlier guidance in this repo said
+Everything else — both servers, `db:migrate`, the seeds, `reconcile`, `settle` — works fine on
+Windows *provided WSL is being kept alive*. Earlier guidance in this repo said
 otherwise; that was the keepalive problem being misread as a Bun-on-Windows driver bug.
 
 ---
@@ -121,21 +135,22 @@ otherwise; that was the keepalive problem being misread as a Bun-on-Windows driv
 
 Seeded by `db:seed:demo`, password **`demo1234`** for all:
 
-| Email | Name | Home wallet |
-|---|---|---|
-| `amara@caribpay.test` | Amara Liburd | XCD (St. Kitts) |
-| `devon@caribpay.test` | Devon Campbell | JMD (Jamaica) |
-| `shanice@caribpay.test` | Shanice Braithwaite | BBD (Barbados) |
-| `ravi@caribpay.test` | Ravi Maharaj | TTD (Trinidad) |
+| Email | Name | Address | Bank |
+|---|---|---|---|
+| `amara@caribpay.test` | Amara Liburd | `amara@caribpay` | SKNANB (XCD) |
+| `devon@caribpay.test` | Devon Campbell | `devon@caribpay` | NCB Jamaica (JMD) |
+| `shanice@caribpay.test` | Shanice Braithwaite | `shanice@caribpay` | Republic Barbados (BBD) |
+| `ravi@caribpay.test` | Ravi Maharaj | `ravi@caribpay` | Republic T&T (TTD) |
 
-They hold balances, a transfer history, and each other as pinned contacts. **Amara → Devon**
-is the money shot: XCD → JMD exercises the FX quote, the 60-second rate lock, and the
-cross-currency ledger legs. See `DEMO.md` for the script.
+They have linked bank accounts, verified phone keys, and each other as pinned contacts.
+**Amara → Devon** is the money shot: XCD → JMD exercises the FX quote, the 60-second lock, the
+two-bank saga, and the cross-currency clearing legs. See `DEMO.md` for the script.
 
-Reset to a clean slate at any time:
+Reset to a clean slate — **both commands**, or balances stay where the last run left them:
 
 ```powershell
-bun run db:seed:demo -- --reset
+bun run db:seed:demo -- --reset        # the switch
+bun run db:seed:bank                   # the banks: balances reset, holds cleared
 ```
 
 ---
@@ -143,14 +158,15 @@ bun run db:seed:demo -- --reset
 ## Checks
 
 ```powershell
-bun run typecheck                      # shared + api + mobile
-bun run reconcile                      # "reconcile clean: N wallet(s) match the ledger"
+bun run typecheck                      # shared + api + mock-bank + mobile
+bun run reconcile                      # positions, caps, stalled transfers, stranded holds
+bun run settle                         # net member-bank positions to zero
 cd apps/mobile; bun x expo export --platform android   # proves Metro resolves everything
 ```
 
 ```powershell
 wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin/bun test"
-# 84 pass
+# 138 pass
 ```
 
 ---
@@ -163,6 +179,9 @@ wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin
 | `bun test` hangs or segfaults | Genuine Bun-on-Windows bug with Postgres | Run it in WSL |
 | `health` says `"db":"down"` just after boot | Containers still starting | Wait ~20 s, `docker ps` until `(healthy)` |
 | App loads on the phone, every request fails | API not running, or on a different host than Metro | Start `bun run dev:api` on Windows; or set `EXPO_PUBLIC_API_URL` |
+| Balances show "unavailable", transfers stall | Mock bank not running | `bun run dev:bank`, then check `http://localhost:3100/health` |
+| "They can't receive money yet" | That user has an address but no linked account | Connect one on their device — inherent to the model |
+| Balances start from the wrong number | Reseeded the switch but not the banks | Run `bun run db:seed:bank` too |
 | Metro: `Unable to resolve @expo/metro-runtime/error-overlay` | Stale hoisted dep after an SDK change | Delete `bun.lock` **and** all `node_modules`, then `bun install` |
 | `expo export`: "Stripping types unsupported under node_modules" | `expo-status-bar` in `app.json` `plugins` | Remove it — no config plugin on SDK 54 |
 | QR scan rejects a code you just generated | Two sides signed with different `QR_HMAC_SECRET` | Always start the API with `bun run dev:api` so `apps/api/.env` loads |

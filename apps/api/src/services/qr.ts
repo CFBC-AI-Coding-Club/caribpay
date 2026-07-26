@@ -2,50 +2,48 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import {
   SUPPORTED_CURRENCIES,
-  WALLET_ADDRESS_PATTERN,
-  homeCurrencyFor,
+  maskName,
   type Currency,
   type QrReceiveResponse,
   type QrResolveResponse,
 } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
-import { users, wallets } from "../db/schema";
+import { linkedAccounts, users } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { env } from "../env";
+import { primaryVpaFor, resolveKey } from "./directory";
 
 // The signature covers every field so none can be swapped without invalidating
 // it. HMAC-SHA256, hex, truncated to 160 bits (plenty, keeps the QR small).
-function sign(address: string, currency: string, name: string, country: string): string {
+function sign(vpa: string, currency: string, name: string, country: string): string {
   return createHmac("sha256", env.qrHmacSecret)
-    .update(`${address}\n${currency}\n${name}\n${country}`)
+    .update(`${vpa}\n${currency}\n${name}\n${country}`)
     .digest("hex")
     .slice(0, 40);
 }
 
-function buildPayload(
-  address: string,
-  currency: Currency,
-  name: string,
-  country: string,
-): string {
+function buildPayload(vpa: string, currency: Currency, name: string, country: string): string {
   const params = new URLSearchParams({
-    address,
+    vpa,
     currency,
     name,
     country,
-    sig: sign(address, currency, name, country),
+    sig: sign(vpa, currency, name, country),
   });
   return `caribpay://pay?${params.toString()}`;
 }
 
 /**
- * The signed QR payload for the caller's wallet. Defaults to the user's home
- * currency wallet, which always exists (created at registration).
+ * The signed payload a receiver's screen encodes.
+ *
+ * It carries a VPA, never an account reference: a QR is shown in public and
+ * photographed, and the directory should be the only thing that can turn an
+ * address into an account. The name is the *masked* one, so scanning and
+ * resolving agree about who you are paying.
  */
 export async function buildReceivePayload(
   dbh: DbHandle,
   userId: string,
-  currency?: Currency,
 ): Promise<QrReceiveResponse> {
   const [user] = await dbh
     .select({ fullName: users.fullName, countryCode: users.countryCode })
@@ -54,31 +52,54 @@ export async function buildReceivePayload(
   if (user === undefined) {
     throw new ApiError(401, "UNAUTHORIZED", "Account no longer exists");
   }
-  const resolvedCurrency = currency ?? homeCurrencyFor(user.countryCode);
 
-  const [row] = await dbh
-    .select({ address: wallets.address })
-    .from(wallets)
-    .where(and(eq(wallets.userId, userId), eq(wallets.currency, resolvedCurrency)));
-  if (row === undefined) {
-    throw new ApiError(404, "WALLET_NOT_FOUND", `You have no ${resolvedCurrency} wallet`);
+  const vpa = await primaryVpaFor(dbh, userId);
+  if (vpa === null) {
+    throw new ApiError(422, "NO_ADDRESS", "You have no payment address yet");
   }
+
+  // Resolving our own key would be refused, so read the routed currency directly.
+  const currency = await routedCurrency(dbh, userId);
+  if (currency === null) {
+    throw new ApiError(
+      422,
+      "NO_LINKED_ACCOUNT",
+      "Connect a bank account before sharing your code",
+    );
+  }
+
+  const displayName = maskName(user.fullName);
   return {
-    walletAddress: row.address,
-    currency: resolvedCurrency,
-    displayName: user.fullName,
-    payload: buildPayload(row.address, resolvedCurrency, user.fullName, user.countryCode),
+    vpa,
+    currency,
+    displayName,
+    countryCode: user.countryCode,
+    payload: buildPayload(vpa, currency, displayName, user.countryCode),
   };
 }
 
+async function routedCurrency(dbh: DbHandle, userId: string): Promise<Currency | null> {
+  const [row] = await dbh
+    .select({ currency: linkedAccounts.currency })
+    .from(linkedAccounts)
+    .where(
+      and(
+        eq(linkedAccounts.userId, userId),
+        eq(linkedAccounts.isDefault, true),
+        eq(linkedAccounts.status, "active"),
+      ),
+    );
+  return row?.currency ?? null;
+}
+
 function verifySignature(
-  address: string,
+  vpa: string,
   currency: string,
   name: string,
   country: string,
   sig: string,
 ): boolean {
-  const expected = sign(address, currency, name, country);
+  const expected = sign(vpa, currency, name, country);
   if (sig.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
@@ -97,25 +118,24 @@ export function resolvePayload(payload: string): QrResolveResponse {
   if (url.protocol !== "caribpay:" || url.hostname !== "pay") {
     throw new ApiError(400, "QR_INVALID", "Not a CaribPay payment QR");
   }
-  const address = url.searchParams.get("address") ?? "";
+  const vpa = url.searchParams.get("vpa") ?? "";
   const currency = url.searchParams.get("currency") ?? "";
   const name = url.searchParams.get("name") ?? "";
   const country = url.searchParams.get("country") ?? "";
   const sig = url.searchParams.get("sig") ?? "";
 
-  if (
-    !WALLET_ADDRESS_PATTERN.test(address) ||
-    !isSupportedCurrency(currency) ||
-    country.length !== 2
-  ) {
+  if (vpa === "" || !isSupportedCurrency(currency) || country.length !== 2) {
     throw new ApiError(400, "QR_INVALID", "QR payload is missing required fields");
   }
-  if (!verifySignature(address, currency, name, country, sig)) {
+  if (!verifySignature(vpa, currency, name, country, sig)) {
     throw new ApiError(400, "QR_SIGNATURE_INVALID", "QR signature does not verify");
   }
-  return { walletAddress: address, currency, displayName: name, countryCode: country };
+  return { vpa, currency, displayName: name, countryCode: country };
 }
 
 function isSupportedCurrency(value: string): value is Currency {
   return (SUPPORTED_CURRENCIES as readonly string[]).includes(value);
 }
+
+/** Re-exported so the scan route can confirm the code still resolves to someone. */
+export { resolveKey };

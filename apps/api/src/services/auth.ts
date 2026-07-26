@@ -1,19 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { sign } from "hono/jwt";
-import {
-  homeCurrencyFor,
-  type AuthTokens,
-  type LoginRequest,
-  type RegisterRequest,
-  type User,
-} from "@caribpay/shared";
+import type { AuthTokens, LoginRequest, RegisterRequest, User } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
 import { refreshTokens, users } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { isUniqueViolation } from "../lib/pg-errors";
 import { env } from "../env";
-import { createWalletForUser } from "./wallets";
+import { mintDefaultVpa } from "./directory";
 
 type UserRow = typeof users.$inferSelect;
 
@@ -65,7 +59,11 @@ export async function registerUser(
           kycStatus: "verified",
         })
         .returning();
-      await createWalletForUser(tx, row!.id, homeCurrencyFor(input.countryCode));
+      // Every new user leaves signup with a working address. The mint is
+      // deliberately neutral and high-entropy so it cannot fail on a collision
+      // or a reserved word — a memorable handle is claimed afterwards, on
+      // purpose. There is no wallet to create: money stays at the bank.
+      await mintDefaultVpa(tx, row!.id);
       return row!;
     });
   } catch (error) {

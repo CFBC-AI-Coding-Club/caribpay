@@ -1,22 +1,14 @@
 import { create } from "zustand";
-import type { Currency, FxQuote } from "@caribpay/shared";
+import type { Currency, FxQuote, ResolveResponse } from "@caribpay/shared";
 import { randomId } from "@/lib/id";
 
-/** Who the money is going to. Resolved from a contact, a typed address, or a QR scan. */
-export interface DraftRecipient {
-  address: string;
-  displayName: string;
-  countryCode: string;
-  /**
-   * The recipient wallet's currency. The API requires the transfer's
-   * destCurrency to match it, so this — not a user choice — decides what they
-   * receive.
-   */
-  currency: Currency;
-}
+/** Who the money is going to, exactly as the directory reported them. */
+export type DraftRecipient = ResolveResponse;
 
 interface DraftState {
   recipient: DraftRecipient | null;
+  /** Which of the payer's accounts funds this. Never inferred by the server. */
+  sourceAccountId: string | null;
   sourceCurrency: Currency | null;
   /** Amount as typed, in major units (e.g. "250.50"). Never a float. */
   amount: string;
@@ -26,14 +18,13 @@ interface DraftState {
   /**
    * Idempotency key for this draft, minted here rather than at request time so a
    * retry after a network failure replays the same request instead of posting a
-   * second transfer. It is re-minted whenever the payload changes — a different
-   * recipient, wallet, or amount is a different transfer — and on reset, so a
+   * second transfer. Re-minted whenever the payload changes, and on reset, so a
    * deliberate second send of the same amount is not mistaken for a retry.
    */
   idempotencyKey: string;
 
   setRecipient: (recipient: DraftRecipient | null) => void;
-  setSourceCurrency: (currency: Currency) => void;
+  setSourceAccount: (accountId: string, currency: Currency) => void;
   setAmount: (amount: string) => void;
   setNote: (note: string) => void;
   setQuote: (quote: FxQuote | null) => void;
@@ -48,6 +39,7 @@ function repriced() {
 function emptyDraft() {
   return {
     recipient: null,
+    sourceAccountId: null,
     sourceCurrency: null,
     amount: "0",
     note: "",
@@ -58,13 +50,14 @@ function emptyDraft() {
 
 /**
  * The in-flight send draft. Lives in a store rather than route params so
- * Compose → Review → Status can hand off a typed object, and so backing out of
- * Review returns to a Compose screen that still has everything filled in.
+ * Recipient → Confirm → Amount → Review can hand off a typed object, and so
+ * backing out returns to a screen that still has everything filled in.
  */
 export const useDraftStore = create<DraftState>((set) => ({
   ...emptyDraft(),
   setRecipient: (recipient) => set({ recipient, ...repriced() }),
-  setSourceCurrency: (sourceCurrency) => set({ sourceCurrency, ...repriced() }),
+  setSourceAccount: (sourceAccountId, sourceCurrency) =>
+    set({ sourceAccountId, sourceCurrency, ...repriced() }),
   setAmount: (amount) => set({ amount, ...repriced() }),
   setNote: (note) => set({ note }),
   setQuote: (quote) => set({ quote }),

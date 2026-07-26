@@ -209,7 +209,7 @@ all the weight, and three status hues appear only to report what actually happen
   reaches 4.97:1. Every solid button, active tab chip, and toggle track. Visually
   indistinguishable from Trade-Wind Blue; the difference exists purely so text passes.
 - **Link** (`{colors.link}`): Darkened a shade further (5.05:1) for text that must be read as
-  interactive — inline links, "Add wallet", the converted amount on the Send screen.
+  interactive — inline links, "Connect an account", the converted amount on the Send screen.
 - **Primary Soft** (`{colors.primary-soft}`): The blue's tint. Icon chips, "Load more",
   quiet secondary actions, the Change button beside a recipient.
 
@@ -217,7 +217,7 @@ all the weight, and three status hues appear only to report what actually happen
 
 - **The Nocturne** (`{colors.nocturne-wine}` → `{colors.nocturne-indigo}` →
   `{colors.nocturne-royal}`, 135°, stops at 0 / 40% / 100%): The signature surface. It carries
-  the total-balance card, wallet balances, the splash, the auth headers, and the profile
+  the bank-balance card, the splash, the auth headers, and the profile
   header. Nothing else may wear it.
 
 ### Tertiary
@@ -304,7 +304,7 @@ test, not the design board.
 
 ### Named Rules
 
-**The Tabular Rule.** Every amount, wallet address, FX rate, countdown, and timestamp is set
+**The Tabular Rule.** Every amount, address, FX rate, countdown, and timestamp is set
 with tabular figures. A number that reflows as its digits change reads as sloppy, and in a
 money app sloppy reads as untrustworthy.
 
@@ -447,14 +447,18 @@ the logo mark bled off the top-right corner at 15% opacity, a flag-and-currency 
 black scrim, and the balance split into three type sizes — 24px symbol, 40px dollars, 24px
 cents — so the figure reads as money rather than a number.
 
-**The Settlement Timeline.** A vertical rail of three steps (Initiated → Pending settlement →
-Settled/Failed) with 28px circular markers: a filled green check for done, a live spinning ring
+The figure it carries is held **at a member bank**, not by CaribPay, so the card says "At your
+bank" and footers with "As reported by your bank just now". The nocturne still means "this is
+your money"; it no longer means "we are holding it".
+
+**The Settlement Timeline.** A vertical rail of three steps (Held at your bank → Clearing
+across the region → Delivered, or Returned) with 28px circular markers: a filled green check for done, a live spinning ring
 for in-flight, a hollow 2px outline for upcoming, a filled red cross for failed. The connector
 between two steps takes the colour of the step *above* it, so a failed leg shows the break in
 the chain. This component is where the product proves it is honest about money.
 
 **The Currency Flag.** Every country is a circular flag drawn as SVG on a 48×48 grid with an
-inset 1px ring at 14% ink. Flags badge avatars, label wallets, and sit in currency chips — they
+inset 1px ring at 14% ink. Flags badge avatars, label bank accounts, and sit in currency chips — they
 are the fastest signal of "which island" in the entire system.
 
 ## Do's and Don'ts

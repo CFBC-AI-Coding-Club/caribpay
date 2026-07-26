@@ -1,12 +1,14 @@
 import { buildApp } from "./app";
 import { env } from "./env";
-import { createSettlementWorker } from "./workers/settlement";
+import { createTransferWorker } from "./workers/transfer";
+import { startRecoverySweeper } from "./workers/recovery";
 
 const app = buildApp();
 
 if (env.workerInProcess) {
-  createSettlementWorker();
-  console.log("settlement worker running in-process");
+  createTransferWorker();
+  startRecoverySweeper();
+  console.log("transfer worker + recovery sweeper running in-process");
 }
 
 console.log(`caribpay-api listening on :${env.port}`);

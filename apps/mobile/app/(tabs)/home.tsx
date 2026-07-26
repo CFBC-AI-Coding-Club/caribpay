@@ -1,40 +1,38 @@
-import { useMemo } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  COUNTRY_NAMES,
-  CURRENCY_NAMES,
-  CURRENCY_SYMBOLS,
-  CURRENCY_TO_COUNTRY,
-  formatAmount,
-  homeCurrencyFor,
-  splitAmount,
-  type Currency,
-  type Wallet,
-} from "@caribpay/shared";
+import { CURRENCY_SYMBOLS, formatAmount, splitAmount, type LinkedAccount } from "@caribpay/shared";
 import { color, radius, shadow, space } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
 import { Flag } from "@/components/Flag";
 import {
   Card,
-  ErrorState,
   EmptyState,
+  ErrorState,
   GradientCard,
+  HomeIndicator,
   IconButton,
   ListRow,
   Screen,
   SectionHeader,
+  SimulatedNotice,
   Skeleton,
   Txt,
 } from "@/components/ui";
-import { useMe, useWalletTransactions, useWallets } from "@/api/hooks";
-import { useAuthStore } from "@/stores/auth";
+import { TransactionRow } from "@/components/TransactionRow";
+import {
+  useAccountBalance,
+  useAccounts,
+  useArrivalWatcher,
+  useMe,
+  useTransactions,
+  useUnreadCount,
+} from "@/api/hooks";
 
-const QUICK_ACTIONS: { icon: IconName; label: string; href: string }[] = [
-  { icon: "send", label: "Send", href: "/send" },
-  { icon: "receive", label: "Receive", href: "/receive" },
-  { icon: "scan", label: "Scan", href: "/scan" },
-  { icon: "plus", label: "Add", href: "/wallet/add" },
+const QUICK_ACTIONS: Array<{ label: string; icon: IconName; href: string }> = [
+  { label: "Send", icon: "send", href: "/send" },
+  { label: "Receive", icon: "receive", href: "/receive" },
+  { label: "Scan", icon: "scan", href: "/scan" },
+  { label: "Accounts", icon: "card", href: "/accounts" },
 ];
 
 function QuickActions() {
@@ -42,122 +40,140 @@ function QuickActions() {
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space.gutter, paddingTop: space.xl, paddingBottom: space.sm }}>
       {QUICK_ACTIONS.map((action) => (
-        <Pressable
-          key={action.label}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          onPress={() => router.push(action.href)}
-          style={{ alignItems: "center", gap: space.sm }}
-        >
-          {({ pressed }) => (
-            <>
-              <View
-                style={[
-                  {
-                    width: 56,
-                    height: 56,
-                    borderRadius: radius.card,
-                    backgroundColor: pressed ? color.primarySoft : color.surface,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  },
-                  shadow.tile,
-                ]}
-              >
-                <Icon name={action.icon} size={23} color={color.link} strokeWidth={2} />
-              </View>
-              <Txt size={12} weight={600} color={color.inkOnTint}>
-                {action.label}
-              </Txt>
-            </>
-          )}
-        </Pressable>
+        <View key={action.label} style={{ alignItems: "center", gap: space.sm }}>
+          <IconButton
+            icon={action.icon}
+            accessibilityLabel={action.label}
+            size={56}
+            elevated
+            onPress={() => router.push(action.href as never)}
+          />
+          <Txt size={12} weight={600} color={color.inkOnTint}>
+            {action.label}
+          </Txt>
+        </View>
       ))}
     </View>
   );
 }
 
-function WalletRow({ wallet, isHome }: { wallet: Wallet; isHome: boolean }) {
-  const router = useRouter();
-  const country = CURRENCY_TO_COUNTRY[wallet.currency];
-  const place = COUNTRY_NAMES[country]?.replace(" & Nevis", "") ?? country;
+/**
+ * The nocturne card, now carrying a balance held at a member bank rather than a
+ * balance we hold. The figure is read live and stated as such: the switch has no
+ * opinion about what someone has, it asks their bank.
+ */
+function BalanceCard({ account }: { account: LinkedAccount }) {
+  const balance = useAccountBalance(account.id);
+  const parts =
+    balance.data === undefined ? null : splitAmount(balance.data.balanceMinor, balance.data.currency);
+
   return (
-    <Card padded={false} style={{ paddingHorizontal: 14 }} onPress={() => router.push(`/wallet/${wallet.id}`)}>
-      <ListRow
-        leading={<Flag currency={wallet.currency} size={44} />}
-        title={CURRENCY_NAMES[wallet.currency]}
-        subtitle={wallet.currency === "USD" ? "USD" : `${wallet.currency} · ${place}`}
-        subtitleAccessory={
-          isHome ? (
-            <View style={{ backgroundColor: color.primarySoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-              <Txt size={11} weight={800} color={color.link} style={{ letterSpacing: 0.35 }}>
-                HOME
-              </Txt>
-            </View>
-          ) : undefined
-        }
-        trailing={
-          <Txt size={15} weight={700} tabular>
-            {formatAmount(wallet.balanceMinor, wallet.currency)}
+    <GradientCard style={{ marginHorizontal: space.gutter }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Txt size={13} weight={600} color={color.onDarkMuted}>
+          At your bank
+        </Txt>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: "rgba(0,0,0,0.20)",
+            paddingHorizontal: 8,
+            paddingVertical: 5,
+            borderRadius: radius.pill,
+          }}
+        >
+          <Flag currency={account.currency} country={account.countryCode} size={18} />
+          <Txt size={12} weight={700} color={color.onDark}>
+            {CURRENCY_SYMBOLS[account.currency]}
           </Txt>
-        }
-      />
-    </Card>
+        </View>
+      </View>
+
+      {balance.isPending ? (
+        <View style={{ marginTop: space.md }}>
+          <Skeleton height={40} width="62%" radius={radius.sm} />
+        </View>
+      ) : balance.isError || parts === null ? (
+        <Txt size={17} weight={700} color={color.onDark} style={{ marginTop: space.md }}>
+          Your bank didn't answer just now
+        </Txt>
+      ) : (
+        <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 6 }}>
+          <Txt size={24} weight={800} color={color.onDark} style={{ marginBottom: 5 }}>
+            {parts.symbol}
+          </Txt>
+          <Txt size={40} weight={800} color={color.onDark} tracking={-0.02} tabular>
+            {parts.whole}
+          </Txt>
+          <Txt size={24} weight={800} color={color.onDark} tabular style={{ marginBottom: 5 }}>
+            {parts.fraction}
+          </Txt>
+        </View>
+      )}
+
+      <View style={{ marginTop: space.md, gap: 4 }}>
+        <Txt size={13} weight={500} color={color.onDarkMuted} numberOfLines={1}>
+          {account.institutionDisplayName} · {account.accountNumberMasked}
+        </Txt>
+        {balance.data !== undefined && (
+          <Txt size={11} weight={500} color={color.onDarkFaint}>
+            As reported by your bank just now
+          </Txt>
+        )}
+      </View>
+    </GradientCard>
   );
 }
 
-/**
- * Net movement in the home wallet over the last seven days. Uses the wallet's
- * own ledger deltas, so it is exact integer arithmetic with no FX guesswork —
- * cross-currency legs are already expressed in this wallet's currency.
- */
-function useWeeklyChange(walletId: string | undefined, currency: Currency) {
-  const scoped = useWalletTransactions(walletId);
-  return useMemo(() => {
-    if (walletId === undefined || scoped.data === undefined) return null;
-    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    let net = 0;
-    let count = 0;
-    for (const tx of scoped.data) {
-      if (tx.status !== "settled" || Date.parse(tx.createdAt) < since) continue;
-      net += tx.walletDeltaMinor ?? 0;
-      count += 1;
-    }
-    if (count === 0) return null;
-    return formatAmount(net, currency, { sign: "always" });
-  }, [walletId, scoped.data, currency]);
+function OtherAccountRow({ account }: { account: LinkedAccount }) {
+  const balance = useAccountBalance(account.id);
+  return (
+    <ListRow
+      leading={<Flag currency={account.currency} country={account.countryCode} size={38} />}
+      title={account.institutionDisplayName}
+      subtitle={`${account.accountNumberMasked} · ${CURRENCY_SYMBOLS[account.currency]}`}
+      trailing={
+        balance.isPending ? (
+          <Skeleton height={15} width={72} radius={radius.sm} />
+        ) : balance.isError || balance.data === undefined ? (
+          <Txt size={12} weight={500} color={color.inkFaint}>
+            unavailable
+          </Txt>
+        ) : (
+          <Txt size={15} weight={700} tabular>
+            {formatAmount(balance.data.balanceMinor, balance.data.currency)}
+          </Txt>
+        )
+      }
+    />
+  );
 }
 
 function HomeSkeleton() {
   return (
-    <View style={{ paddingHorizontal: space.gutter, gap: space.md }}>
-      <Skeleton height={150} radius={radius.cardLg} />
-      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 8, paddingVertical: space.lg }}>
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} width={56} height={56} radius={radius.card} />
-        ))}
-      </View>
-      {[0, 1, 2].map((i) => (
-        <Skeleton key={i} height={68} radius={radius.card} />
-      ))}
+    <View style={{ paddingHorizontal: space.gutter, gap: space.lg, paddingTop: space.sm }}>
+      <Skeleton height={168} radius={radius.cardLg} />
+      <Skeleton height={72} radius={radius.card} />
+      <Skeleton height={180} radius={radius.card} />
     </View>
   );
 }
 
 export default function HomeScreen() {
   const router = useRouter();
-  const wallets = useWallets();
   const me = useMe();
-  const sessionUser = useAuthStore((s) => s.user);
+  const accounts = useAccounts();
+  const feed = useTransactions();
+  const unread = useUnreadCount();
+  useArrivalWatcher(unread.data);
 
-  const user = me.data?.user ?? sessionUser;
-  const homeCurrency = user === null || user === undefined ? "XCD" : homeCurrencyFor(user.countryCode);
-  const homeWallet = wallets.data?.wallets.find((w) => w.currency === homeCurrency);
-  const weeklyChange = useWeeklyChange(homeWallet?.id, homeCurrency);
-
-  const total = wallets.data?.totalBalance;
-  const amount = total === undefined ? null : splitAmount(total.amountMinor, total.currency);
-  const walletCount = wallets.data?.wallets.length ?? 0;
+  const user = me.data?.user;
+  const list = accounts.data?.accounts ?? [];
+  const primary = list.find((a) => a.isDefault) ?? list[0];
+  const others = list.filter((a) => a.id !== primary?.id);
+  const recent = feed.items.slice(0, 6);
 
   return (
     <Screen edges={{ bottom: false }}>
@@ -181,108 +197,102 @@ export default function HomeScreen() {
         </View>
         <IconButton
           icon="bell"
-          accessibilityLabel="Notifications"
+          accessibilityLabel={
+            unread.data !== undefined && unread.data > 0
+              ? `Notifications, ${unread.data} unread`
+              : "Notifications"
+          }
           strokeWidth={1.8}
+          badge={unread.data !== undefined && unread.data > 0}
           onPress={() => router.push("/(tabs)/activity")}
         />
       </View>
 
-      {wallets.isError ? (
+      {accounts.isError ? (
         <ErrorState
-          title="We can't reach your wallets"
-          body="Check your connection and try again — nothing has changed on your account."
-          onRetry={() => void wallets.refetch()}
+          title="We can't reach your accounts"
+          body="Check your connection and try again — nothing has changed at your bank."
+          onRetry={() => void accounts.refetch()}
         />
-      ) : wallets.isPending ? (
+      ) : accounts.isPending ? (
         <HomeSkeleton />
-      ) : walletCount === 0 ? (
+      ) : primary === undefined ? (
+        // Inherent to the model: an address is only payable once its owner has
+        // connected a bank. This is the first thing a new user must do.
         <EmptyState
           icon="card"
-          title="Open your first wallet"
-          body="Add a currency wallet to start sending and receiving across the Caribbean — no fees, no US dollar."
-          actionLabel="Add a wallet"
-          onAction={() => router.push("/wallet/add")}
+          title="Connect your bank account"
+          body="CaribPay moves money between banks — it never holds it. Connect an account and your CaribPay address starts working."
+          actionLabel="Connect an account"
+          actionIcon="plus"
+          onAction={() => router.push("/accounts/link")}
         />
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingBottom: space.xxl }}
           refreshControl={
-            <RefreshControl refreshing={wallets.isRefetching} onRefresh={() => void wallets.refetch()} tintColor={color.interactive} />
+            <RefreshControl
+              refreshing={accounts.isRefetching}
+              onRefresh={() => void accounts.refetch()}
+              tintColor={color.interactive}
+            />
           }
         >
-          <GradientCard style={{ marginHorizontal: space.gutter }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Txt size={13} weight={600} color={color.onDarkMuted}>
-                Total balance
-              </Txt>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: space.sm,
-                  backgroundColor: "rgba(0,0,0,0.2)",
-                  paddingLeft: 6,
-                  paddingRight: space.md,
-                  paddingVertical: 6,
-                  borderRadius: radius.pill,
-                }}
-              >
-                <Flag currency={homeCurrency} size={20} />
-                <Txt size={12} weight={700} color={color.onDark}>
-                  {CURRENCY_SYMBOLS[homeCurrency]} · {homeCurrency}
-                </Txt>
-              </View>
-            </View>
-
-            {amount !== null && (
-              <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: space.md }}>
-                <Txt size={24} weight={700} color="rgba(255,255,255,0.85)" leading={1.4}>
-                  {amount.symbol}
-                </Txt>
-                <Txt size={40} weight={800} color={color.onDark} tracking={-0.02} leading={1} tabular>
-                  {amount.whole}
-                </Txt>
-                <Txt size={24} weight={700} color="rgba(255,255,255,0.85)" leading={1.4} tabular>
-                  {amount.fraction}
-                </Txt>
-              </View>
-            )}
-
-            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.md }}>
-              <Txt size={13} weight={500} color={color.onDarkMuted}>
-                Across {walletCount} {walletCount === 1 ? "wallet" : "wallets"}
-              </Txt>
-              {weeklyChange !== null && (
-                <>
-                  <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.4)" }} />
-                  <Txt size={12} weight={700} color={color.gainOnDark} tabular>
-                    {weeklyChange} this week
-                  </Txt>
-                </>
-              )}
-            </View>
-          </GradientCard>
-
+          <BalanceCard account={primary} />
           <QuickActions />
 
-          <View style={{ paddingHorizontal: space.gutter, paddingTop: 14 }}>
-            {/*
-              The board labels this "See all", but Home already lists every wallet —
-              so the action that's actually useful here is opening another one.
-            */}
-            <SectionHeader
-              title="Your wallets"
-              action="Add wallet"
-              onAction={() => router.push("/wallet/add")}
-            />
-            <View style={{ gap: 10 }}>
-              {wallets.data.wallets.map((wallet) => (
-                <WalletRow key={wallet.id} wallet={wallet} isHome={wallet.currency === homeCurrency} />
-              ))}
-            </View>
+          <View style={{ paddingHorizontal: space.gutter, paddingTop: 6 }}>
+            <SimulatedNotice compact />
           </View>
+
+          {others.length > 0 && (
+            <>
+              <SectionHeader title="Other accounts" />
+              <Card padded={false} style={{ marginHorizontal: space.gutter, paddingHorizontal: 14 }}>
+                {others.map((account) => (
+                  <OtherAccountRow key={account.id} account={account} />
+                ))}
+              </Card>
+            </>
+          )}
+
+          <SectionHeader
+            title="Regional transfers"
+            action={recent.length > 0 ? "See all" : undefined}
+            onAction={() => router.push("/(tabs)/activity")}
+          />
+          {recent.length === 0 ? (
+            <View
+              style={[
+                {
+                  marginHorizontal: space.gutter,
+                  backgroundColor: color.surface,
+                  borderRadius: radius.card,
+                  padding: 18,
+                  alignItems: "center",
+                  gap: 6,
+                },
+                shadow.card,
+              ]}
+            >
+              <Icon name="activity" size={24} color={color.inkSubtle} strokeWidth={1.8} />
+              <Txt size={13} weight={600} color={color.inkMuted} align="center">
+                No transfers yet
+              </Txt>
+              <Txt size={12} weight={500} color={color.inkFaint} align="center">
+                Send to a CaribPay address and it appears here.
+              </Txt>
+            </View>
+          ) : (
+            <Card padded={false} style={{ marginHorizontal: space.gutter, paddingHorizontal: 14 }}>
+              {recent.map((tx) => (
+                <TransactionRow key={tx.id} transaction={tx} />
+              ))}
+            </Card>
+          )}
         </ScrollView>
       )}
+      <HomeIndicator />
     </Screen>
   );
 }

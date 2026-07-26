@@ -26,7 +26,7 @@ export const CURRENCY_NAMES: Record<Currency, string> = {
   USD: "US Dollar",
 };
 
-/** Countries with a designed flag. Used for wallet, contact, and profile chips. */
+/** Countries with a designed flag. Used for account, contact, and profile chips. */
 export const FLAG_COUNTRIES = ["KN", "JM", "BB", "TT", "VC", "US"] as const;
 export type FlagCountry = (typeof FLAG_COUNTRIES)[number];
 
@@ -96,14 +96,6 @@ export const TRANSACTION_TYPES = [
 ] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
-export const TRANSACTION_STATUSES = [
-  "initiated",
-  "pending_settlement",
-  "settled",
-  "failed",
-] as const;
-export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
-
 export const KYC_STATUSES = ["unverified", "pending", "verified"] as const;
 export type KycStatus = (typeof KYC_STATUSES)[number];
 
@@ -118,8 +110,6 @@ export type KycStatus = (typeof KYC_STATUSES)[number];
  * must be released). Held funds sitting in someone's real bank account are the
  * worst state to be stuck in, so `reversal_pending` is retried to exhaustion.
  *
- * Declared here separately from TRANSACTION_STATUSES, which still describes the
- * wallet-era rows; the two are merged in the migration that adds these values.
  */
 export const TRANSFER_LIFECYCLE_STATUSES = [
   "initiated",
@@ -132,6 +122,9 @@ export const TRANSFER_LIFECYCLE_STATUSES = [
   "reversed",
 ] as const;
 export type TransferLifecycleStatus = (typeof TRANSFER_LIFECYCLE_STATUSES)[number];
+
+/** Alias kept because "the status of a transaction" reads better at call sites. */
+export type TransactionStatus = TransferLifecycleStatus;
 
 /** States from which no further transition is possible. */
 export const TERMINAL_TRANSFER_STATUSES = ["completed", "failed", "reversed"] as const;
@@ -180,7 +173,5 @@ export const FALLBACK_CURRENCY: Currency = "USD";
 export function homeCurrencyFor(countryCode: string): Currency {
   return COUNTRY_TO_CURRENCY[countryCode.toUpperCase()] ?? FALLBACK_CURRENCY;
 }
-
-export const WALLET_ADDRESS_PATTERN = /^CW(-[A-Z0-9]{4}){4}$/;
 
 export const FX_QUOTE_TTL_SECONDS = 60;

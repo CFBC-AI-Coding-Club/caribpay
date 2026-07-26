@@ -106,38 +106,54 @@ function useSettlementAnnouncement(
   const announced = useRef<string | null>(null);
 
   useEffect(() => {
-    if (status !== "settled" && status !== "failed") return;
+    if (status !== "completed" && status !== "failed") return;
     if (announced.current === status) return;
     announced.current = status;
 
     AccessibilityInfo.announceForAccessibility(
-      status === "settled"
+      status === "completed"
         ? `Sent. ${received} delivered to ${recipientName}.`
-        : "Transfer failed. No money left your wallet.",
+        : "Transfer failed. No money left your account.",
     );
   }, [status, recipientName, received]);
 }
 
+/**
+ * Eight saga states onto three steps a payer needs.
+ *
+ * "Held at your bank" is the honest name for `debit_held`: the money is reserved
+ * but has not moved, and if the next step fails it is released in full. Saying
+ * "sent" there would be a lie the reversal screen then has to undo.
+ */
 function statusSteps(tx: Transaction): Step[] {
-  const terminal = tx.status === "settled" || tx.status === "failed";
+  const held =
+    tx.status === "debit_held" ||
+    tx.status === "credit_pending" ||
+    tx.status === "completed";
+  const done = tx.status === "completed";
+  const undone = tx.status === "reversed" || tx.status === "reversal_pending";
+
   return [
-    { label: "Initiated", detail: timeWithSeconds(tx.createdAt), state: "done" },
     {
-      label: "Pending settlement",
-      detail: terminal ? undefined : "Clearing across the region…",
-      state: terminal ? "done" : "active",
+      label: "Held at your bank",
+      detail: timeWithSeconds(tx.createdAt),
+      state: tx.status === "failed" ? "failed" : held || undone ? "done" : "active",
     },
-    tx.status === "failed"
+    {
+      label: "Clearing across the region",
+      detail: done ? undefined : undone ? "Reversing" : "Instructing their bank…",
+      state: done ? "done" : undone ? "failed" : held ? "active" : "upcoming",
+    },
+    tx.status === "failed" || undone
       ? {
-          label: "Settlement failed",
-          detail: tx.settledAt === null ? undefined : timeWithSeconds(tx.settledAt),
-          state: "failed",
+          label: tx.status === "reversed" ? "Returned in full" : "Returning your money",
+          detail: tx.status === "reversed" ? "No money left your account" : undefined,
+          state: tx.status === "reversed" ? "failed" : "active",
         }
       : {
-          label: "Settled",
-          detail:
-            tx.settledAt === null ? "Delivered to recipient" : timeWithSeconds(tx.settledAt),
-          state: tx.status === "settled" ? "done" : "upcoming",
+          label: "Delivered",
+          detail: tx.settledAt === null ? "Into their account" : timeWithSeconds(tx.settledAt),
+          state: done ? "done" : "upcoming",
         },
   ];
 }
@@ -174,7 +190,7 @@ export default function TransferStatusScreen() {
   const firstName = recipientName.split(" ")[0] ?? recipientName;
   const received = formatAmount(tx.destAmountMinor, tx.destCurrency);
 
-  const settled = tx.status === "settled";
+  const settled = tx.status === "completed";
   const failed = tx.status === "failed";
 
   // This screen changes under the user while they watch it. Sighted users get
