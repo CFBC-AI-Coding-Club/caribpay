@@ -3,11 +3,12 @@ import {
   applyRate,
   bankStepKey,
   formatAmount,
+  maskName,
   type Transaction,
   type TransferRequest,
 } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
-import { institutions, linkedAccounts, transactions } from "../db/schema";
+import { institutions, linkedAccounts, transactions, users } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { isUniqueViolation } from "../lib/pg-errors";
 import { enqueueTransfer } from "../lib/queue";
@@ -310,6 +311,14 @@ export async function driveTransfer(dbh: DbHandle, transactionId: string): Promi
   }
 }
 
+async function maskedNameOf(dbh: DbHandle, userId: string): Promise<string | null> {
+  const [row] = await dbh
+    .select({ fullName: users.fullName })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row === undefined ? null : maskName(row.fullName);
+}
+
 async function loadTransfer(dbh: DbHandle, id: string): Promise<TransactionRow | undefined> {
   const [row] = await dbh.select().from(transactions).where(eq(transactions.id, id));
   return row;
@@ -359,12 +368,16 @@ async function finalizeCompleted(
       .where(eq(transactions.id, row.id));
 
     if (row.recipientUserId !== null) {
+      // Name the *sender*: recipientNameSnapshot is who the payer was paying,
+      // which is the recipient themselves and tells them nothing.
+      const senderName =
+        row.senderUserId === null ? null : await maskedNameOf(tx, row.senderUserId);
       await writeNotification(tx, {
         userId: row.recipientUserId,
         type: "transfer_received",
         title: "Money arrived",
         body: `${formatAmount(row.destAmountMinor, row.destCurrency)} from ${
-          row.recipientNameSnapshot === null ? "someone" : "a CaribPay member"
+          senderName ?? "a CaribPay member"
         }`,
         data: { transactionId: row.id },
       });
