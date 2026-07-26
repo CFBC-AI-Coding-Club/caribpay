@@ -5,12 +5,15 @@
   "scripts": {
     "dev:api": "bun run --cwd apps/api dev",
     "dev:mobile": "bun run --cwd apps/mobile start",
-    "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd apps/api typecheck && bun run --cwd apps/mobile typecheck",
+    "dev:bank": "bun run --cwd apps/mock-bank dev",
+    "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd apps/api typecheck && bun run --cwd apps/mock-bank typecheck && bun run --cwd apps/mobile typecheck",
     "test": "bun test",
     "db:generate": "bun run --cwd apps/api db:generate",
     "db:migrate": "bun run --cwd apps/api db:migrate",
     "db:seed": "bun run --cwd apps/api db:seed",
     "db:seed:demo": "bun run --cwd apps/api db:seed:demo",
+    "db:migrate:bank": "bun run --cwd apps/mock-bank db:migrate",
+    "db:seed:bank": "bun run --cwd apps/mock-bank db:seed",
     "reconcile": "bun run --cwd apps/api reconcile"
   },
   "devDependencies": {

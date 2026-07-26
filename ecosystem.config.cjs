@@ -9,6 +9,20 @@ const BUN = process.env.BUN_PATH || `${process.env.HOME}/.bun/bin/bun`;
 module.exports = {
   apps: [
     {
+      // The simulated member banks. The API reaches customer accounts only
+      // over HTTP through this service, and has no credentials for its
+      // database — that boundary is the claim that we hold no funds.
+      name: "caribpay-mock-bank",
+      script: "apps/mock-bank/src/index.ts",
+      interpreter: BUN,
+      env: {
+        NODE_ENV: "production",
+        BANK_PORT: "3100",
+      },
+      max_restarts: 10,
+      restart_delay: 2000,
+    },
+    {
       name: "caribpay-api",
       script: "apps/api/src/index.ts",
       interpreter: BUN,

@@ -1,0 +1,491 @@
+{
+  "id": "fb598bc9-f185-4dd3-8da6-be66eab7e5cc",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.accounts": {
+      "name": "accounts",
+      "schema": "",
+      "columns": {
+        "account_ref": {
+          "name": "account_ref",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "institution_handle": {
+          "name": "institution_handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "holder_name": {
+          "name": "holder_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "bank_currency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "balance_minor": {
+          "name": "balance_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "bank_account_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "accounts_institution_idx": {
+          "name": "accounts_institution_idx",
+          "columns": [
+            {
+              "expression": "institution_handle",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "accounts_balance_non_negative": {
+          "name": "accounts_balance_non_negative",
+          "value": "\"accounts\".\"balance_minor\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.bank_idempotency_records": {
+      "name": "bank_idempotency_records",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "request_hash": {
+          "name": "request_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "response_status": {
+          "name": "response_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_body": {
+          "name": "response_body",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.credits": {
+      "name": "credits",
+      "schema": "",
+      "columns": {
+        "credit_ref": {
+          "name": "credit_ref",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_ref": {
+          "name": "account_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "bank_currency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "posted_at": {
+          "name": "posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "credits_reference_idx": {
+          "name": "credits_reference_idx",
+          "columns": [
+            {
+              "expression": "reference",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "credits_account_ref_accounts_account_ref_fk": {
+          "name": "credits_account_ref_accounts_account_ref_fk",
+          "tableFrom": "credits",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_ref"
+          ],
+          "columnsTo": [
+            "account_ref"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.debits": {
+      "name": "debits",
+      "schema": "",
+      "columns": {
+        "debit_ref": {
+          "name": "debit_ref",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hold_ref": {
+          "name": "hold_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_ref": {
+          "name": "account_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "bank_currency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settled_at": {
+          "name": "settled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "debits_hold_uq": {
+          "name": "debits_hold_uq",
+          "columns": [
+            {
+              "expression": "hold_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "debits_hold_ref_holds_hold_ref_fk": {
+          "name": "debits_hold_ref_holds_hold_ref_fk",
+          "tableFrom": "debits",
+          "tableTo": "holds",
+          "columnsFrom": [
+            "hold_ref"
+          ],
+          "columnsTo": [
+            "hold_ref"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "debits_account_ref_accounts_account_ref_fk": {
+          "name": "debits_account_ref_accounts_account_ref_fk",
+          "tableFrom": "debits",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_ref"
+          ],
+          "columnsTo": [
+            "account_ref"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.holds": {
+      "name": "holds",
+      "schema": "",
+      "columns": {
+        "hold_ref": {
+          "name": "hold_ref",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_ref": {
+          "name": "account_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "bank_currency",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "hold_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'outstanding'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "holds_account_status_idx": {
+          "name": "holds_account_status_idx",
+          "columns": [
+            {
+              "expression": "account_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "holds_reference_idx": {
+          "name": "holds_reference_idx",
+          "columns": [
+            {
+              "expression": "reference",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "holds_account_ref_accounts_account_ref_fk": {
+          "name": "holds_account_ref_accounts_account_ref_fk",
+          "tableFrom": "holds",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_ref"
+          ],
+          "columnsTo": [
+            "account_ref"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "holds_amount_positive": {
+          "name": "holds_amount_positive",
+          "value": "\"holds\".\"amount_minor\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.bank_account_status": {
+      "name": "bank_account_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "frozen",
+        "closed"
+      ]
+    },
+    "public.bank_currency": {
+      "name": "bank_currency",
+      "schema": "public",
+      "values": [
+        "XCD",
+        "JMD",
+        "BBD",
+        "TTD",
+        "USD"
+      ]
+    },
+    "public.hold_status": {
+      "name": "hold_status",
+      "schema": "public",
+      "values": [
+        "outstanding",
+        "confirmed",
+        "released",
+        "expired"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

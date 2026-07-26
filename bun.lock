@@ -56,6 +56,19 @@
         "typescript": "~5.9.2",
       },
     },
+    "apps/mock-bank": {
+      "name": "@caribpay/mock-bank",
+      "version": "0.1.0",
+      "dependencies": {
+        "@caribpay/shared": "workspace:*",
+        "drizzle-orm": "^0.45.2",
+        "hono": "^4.12.31",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "drizzle-kit": "^0.31.10",
+      },
+    },
     "packages/shared": {
       "name": "@caribpay/shared",
       "version": "0.1.0",
@@ -256,6 +269,8 @@
     "@caribpay/api": ["@caribpay/api@workspace:apps/api"],
 
     "@caribpay/mobile": ["@caribpay/mobile@workspace:apps/mobile"],
+
+    "@caribpay/mock-bank": ["@caribpay/mock-bank@workspace:apps/mock-bank"],
 
     "@caribpay/shared": ["@caribpay/shared@workspace:packages/shared"],
 

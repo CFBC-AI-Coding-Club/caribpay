@@ -10,6 +10,8 @@ services:
       POSTGRES_DB: caribpay
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Creates the mock-bank and test databases on first boot.
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U caribpay -d caribpay"]
       interval: 5s

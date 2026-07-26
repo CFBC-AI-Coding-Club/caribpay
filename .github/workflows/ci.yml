@@ -33,6 +33,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://caribpay:caribpay@localhost:5432/caribpay
+      BANK_DATABASE_URL: postgresql://caribpay:caribpay@localhost:5432/caribpay_bank
       REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
@@ -40,5 +41,12 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
+      # The service container only creates POSTGRES_DB, so the bank's
+      # database and both test databases are created here.
+      - name: Create databases
+        run: |
+          for db in caribpay_bank caribpay_test caribpay_bank_test; do
+            PGPASSWORD=caribpay createdb -h localhost -U caribpay "$db"
+          done
       - run: bun run typecheck
       - run: bun test
