@@ -12,29 +12,47 @@ Read against: `OVERVIEW.md`, `PRODUCT.md`, `DESIGN.md`, `DEMO.md`, `RUNNING.md`,
 
 ---
 
-## Progress
+## Progress — all phases complete
 
-| Phase | State | Commit |
-|---|---|---|
-| 2 · shared contracts | **done** — 47 tests | `110bc1b` |
-| 1 · `apps/mock-bank` | **done** — 23 tests | `5febb5a` |
-| 3 · api: drop wallets, directory, connector | next | — |
-| 4–10 | not started | — |
+| Phase | State |
+|---|---|
+| 1 · `apps/mock-bank` | done |
+| 2 · shared contracts | done |
+| 3 · api: drop wallets, directory, connector | done |
+| 4 · transfer saga + recovery sweeper | done |
+| 5 · clearing ledger on bank positions, caps | done |
+| 6 · net settlement, `bun run settle` | done |
+| 7 · mobile rebuild | done |
+| 8 · notifications | done |
+| 9 · seeds and demo data | done |
+| 10 · docs | done |
 
-Tree is green at `5febb5a`: 154 tests, four workspaces typecheck, `reconcile` clean, and the
-existing St Kitts → Jamaica wallet demo still runs. **Phase 3 opens with the destructive migration,
-so it should be started only with room to finish it** — a half-dropped `wallets` table with a
-half-rewritten transfer service is the one state this plan exists to avoid.
+Four workspaces typecheck, **138 tests pass**, `reconcile` clean, `settle` nets to zero, the app
+bundles, and the full demo path has been run live end to end.
 
-Two findings from the work so far that change later phases:
+### What changed from the plan, and why
 
-- **`apps/api/src/middleware/idempotency.ts` has a check-then-act race.** It reads for an existing
-  record and then proceeds, so concurrent retries of one instruction all execute. The identical bug
-  in the mock bank placed three holds for ten concurrent retries of one hold. Fix it in phase 3 with
-  the same claim-by-insert pattern (`apps/mock-bank/src/middleware/idempotency.ts`), together with
-  the `response_body` NOT NULL issue from v1 §1.9 — both need one migration.
-- **Institution data lives in `packages/shared/src/institutions-data.ts`**, not the API seed folder
-  as v1 specified, because both services seed from it.
+- **§1.4's destructive migration became a clean baseline.** drizzle-kit could not diff the enum
+  changes without an interactive prompt, and the migration dropped nearly everything anyway. A
+  wallet-era database cannot migrate forward — drop and recreate. The fallback runs from
+  `v0.1.0-wallet-demo` on its own database and is unaffected.
+- **Directory uniqueness is global, not partial.** The plan carried a partial index
+  `WHERE released_at IS NULL` forward from v1, which would have *permitted* recycling. Global
+  uniqueness is what "never reissued" actually requires.
+- **Notifications and settlement cycles went into the baseline**, saving two migrations.
+- **`resolve` returns no user id.** The client never needs one, and omitting it keeps an
+  enumerable identifier out of a lookup oracle.
+- **Idempotency travels in the header**, not the body: confirm and release have no body.
+
+### Found by tests rather than by reading
+
+- The mock bank's idempotency middleware had a check-then-act race — ten concurrent retries of
+  one hold placed **three holds**. `apps/api` had the identical bug on `POST /transfers`. Both
+  now claim the key by INSERT before the handler runs.
+- The netting contra had an inverted sign; the ledger invariant rejected the posting rather than
+  letting the books drift.
+- A live demo run surfaced two more: `db:seed:bank` never reset balances, and the arrival
+  notification named the payee instead of the sender.
 
 ## Part 0 — Carried forward from plan v1
 
