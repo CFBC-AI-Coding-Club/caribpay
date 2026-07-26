@@ -12,6 +12,30 @@ Read against: `OVERVIEW.md`, `PRODUCT.md`, `DESIGN.md`, `DEMO.md`, `RUNNING.md`,
 
 ---
 
+## Progress
+
+| Phase | State | Commit |
+|---|---|---|
+| 2 · shared contracts | **done** — 47 tests | `110bc1b` |
+| 1 · `apps/mock-bank` | **done** — 23 tests | `5febb5a` |
+| 3 · api: drop wallets, directory, connector | next | — |
+| 4–10 | not started | — |
+
+Tree is green at `5febb5a`: 154 tests, four workspaces typecheck, `reconcile` clean, and the
+existing St Kitts → Jamaica wallet demo still runs. **Phase 3 opens with the destructive migration,
+so it should be started only with room to finish it** — a half-dropped `wallets` table with a
+half-rewritten transfer service is the one state this plan exists to avoid.
+
+Two findings from the work so far that change later phases:
+
+- **`apps/api/src/middleware/idempotency.ts` has a check-then-act race.** It reads for an existing
+  record and then proceeds, so concurrent retries of one instruction all execute. The identical bug
+  in the mock bank placed three holds for ten concurrent retries of one hold. Fix it in phase 3 with
+  the same claim-by-insert pattern (`apps/mock-bank/src/middleware/idempotency.ts`), together with
+  the `response_body` NOT NULL issue from v1 §1.9 — both need one migration.
+- **Institution data lives in `packages/shared/src/institutions-data.ts`**, not the API seed folder
+  as v1 specified, because both services seed from it.
+
 ## Part 0 — Carried forward from plan v1
 
 Still true, still planned, not repeated below:
