@@ -56,10 +56,13 @@ export default function ReceiveScreen() {
       <ScreenHeader title="Receive money" />
 
       {notPayable ? (
+        // The QR is withheld rather than shown dead — a code that cannot be paid
+        // would be worse than none — but copying the address is still allowed,
+        // because it works the moment a bank is linked.
         <EmptyState
           icon="card"
-          title="Connect a bank account first"
-          body="Your CaribPay address needs an account to deliver money into. Connect one and your address starts working immediately."
+          title="The address is yours, the landing place is missing"
+          body="Money arrives at a bank account, and you have not linked one yet. Nobody can pay you until you do — and no one else can ever take this address."
           actionLabel="Connect an account"
           actionIcon="plus"
           onAction={() => router.replace("/accounts/link")}
@@ -123,7 +126,8 @@ export default function ReceiveScreen() {
             <Txt size={11} weight={600} color={color.inkMuted}>
               YOUR CARIBPAY ADDRESS
             </Txt>
-            <Txt size={24} weight={800} tabular align="center" numberOfLines={1} adjustsFontSizeToFit>
+            {/* 31px — larger than the screen title, because it is the payload. */}
+            <Txt size={31} weight={800} tabular align="center" numberOfLines={1} adjustsFontSizeToFit>
               {receive.data.vpa}
             </Txt>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
@@ -182,6 +186,9 @@ export default function ReceiveScreen() {
 
           <Txt size={13} weight={500} color={color.inkMuted} align="center" style={{ marginTop: space.md }}>
             Scan to pay {receive.data.displayName} — no fees
+          </Txt>
+          <Txt size={11} weight={500} color={color.inkFaint} align="center" style={{ marginTop: 4 }}>
+            Signed by CaribPay. A screenshot of this code still works.
           </Txt>
 
           <View style={{ flexDirection: "row", gap: 10, marginTop: space.lg, width: "100%" }}>

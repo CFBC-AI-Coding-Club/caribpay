@@ -1,6 +1,6 @@
 import { Alert, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
-import { COUNTRY_NAMES, homeCurrencyFor } from "@caribpay/shared";
+import { COUNTRY_NAMES, MAX_ACTIVE_DIRECTORY_KEYS, homeCurrencyFor } from "@caribpay/shared";
 import { color, radius, space } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
 import {
@@ -13,7 +13,7 @@ import {
   Skeleton,
   Txt,
 } from "@/components/ui";
-import { useAccounts, useContacts, useLogout, useMe } from "@/api/hooks";
+import { useAccounts, useContacts, useDirectoryKeys, useLogout, useMe } from "@/api/hooks";
 import { useAuthStore } from "@/stores/auth";
 
 function MenuItem({
@@ -74,12 +74,14 @@ export default function MenuScreen() {
   const router = useRouter();
   const me = useMe();
   const accounts = useAccounts();
+  const keys = useDirectoryKeys();
   const contacts = useContacts();
   const logout = useLogout();
   const sessionUser = useAuthStore((s) => s.user);
 
   const user = me.data?.user ?? sessionUser;
   const accountCount = accounts.data?.accounts.length ?? 0;
+  const keyCount = keys.data?.length ?? 0;
   const contactCount = contacts.data?.length ?? 0;
 
   function confirmLogout() {
@@ -142,12 +144,13 @@ export default function MenuScreen() {
               <MenuItem
                 icon="card"
                 label="Bank accounts"
-                detail={`${accountCount} connected`}
+                detail={String(accountCount)}
                 onPress={() => router.push("/accounts")}
               />
               <MenuItem
                 icon="mail"
                 label="Your addresses"
+                detail={`${keyCount} of ${MAX_ACTIVE_DIRECTORY_KEYS}`}
                 onPress={() => router.push("/directory/keys")}
               />
               <MenuItem
@@ -168,7 +171,7 @@ export default function MenuScreen() {
               <MenuItem
                 icon="shieldCheck"
                 label="Settlement positions"
-                detail="What each bank owes"
+                detail="What the member banks owe each other"
                 onPress={() => router.push("/settlement")}
               />
               <MenuItem
@@ -193,7 +196,7 @@ export default function MenuScreen() {
             </RowGroup>
 
             <Txt size={12} weight={500} color={color.inkFaint} align="center" style={{ paddingTop: 4 }}>
-              CaribPay v1.0.0 · Made for the Caribbean
+              CaribPay v1.0.0 · {COUNTRY_NAMES[user.countryCode] ?? user.countryCode}
             </Txt>
           </View>
         </ScrollView>

@@ -1,17 +1,25 @@
+import { useMemo } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
-import { CURRENCY_SYMBOLS, formatAmount, splitAmount, type LinkedAccount } from "@caribpay/shared";
+import {
+  CURRENCY_SYMBOLS,
+  formatAmount,
+  splitAmount,
+  type LinkedAccount,
+  type Transaction,
+} from "@caribpay/shared";
 import { color, radius, shadow, space } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
 import { Flag } from "@/components/Flag";
 import {
   Card,
-  EmptyState,
   ErrorState,
+  Button,
   GradientCard,
   HomeIndicator,
   IconButton,
   ListRow,
+  Pill,
   Screen,
   SectionHeader,
   Skeleton,
@@ -21,6 +29,7 @@ import { TransactionRow } from "@/components/TransactionRow";
 import {
   useAccountBalance,
   useAccounts,
+  useDirectoryKeys,
   useMe,
   useTransactions,
   useUnreadCount,
@@ -92,10 +101,46 @@ function QuickActions() {
  * balance we hold. The figure is read live and stated as such: the switch has no
  * opinion about what someone has, it asks their bank.
  */
-function BalanceCard({ account }: { account: LinkedAccount }) {
+/**
+ * Net movement through this account over the last seven days.
+ *
+ * Computed from the feed, so it is only shown once the whole feed is loaded —
+ * a figure derived from the first page would silently understate itself, which
+ * is worse than not showing it.
+ */
+function useWeeklyDelta(account: LinkedAccount, items: Transaction[], complete: boolean) {
+  return useMemo(() => {
+    if (!complete) return null;
+    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    let net = 0;
+    let seen = 0;
+    for (const tx of items) {
+      if (tx.status !== "completed" || Date.parse(tx.createdAt) < since) continue;
+      if (tx.direction === "out" && tx.sourceCurrency === account.currency) {
+        net -= tx.sourceAmountMinor;
+        seen += 1;
+      } else if (tx.direction === "in" && tx.destCurrency === account.currency) {
+        net += tx.destAmountMinor;
+        seen += 1;
+      }
+    }
+    return seen === 0 ? null : net;
+  }, [account.currency, items, complete]);
+}
+
+function BalanceCard({
+  account,
+  items,
+  feedComplete,
+}: {
+  account: LinkedAccount;
+  items: Transaction[];
+  feedComplete: boolean;
+}) {
   const balance = useAccountBalance(account.id);
   const parts =
     balance.data === undefined ? null : splitAmount(balance.data.balanceMinor, balance.data.currency);
+  const weekly = useWeeklyDelta(account, items, feedComplete);
 
   return (
     <GradientCard style={{ marginHorizontal: space.gutter }}>
@@ -126,7 +171,7 @@ function BalanceCard({ account }: { account: LinkedAccount }) {
         </View>
       ) : balance.isError || parts === null ? (
         <Txt size={17} weight={700} color={color.onDark} style={{ marginTop: space.md }}>
-          Your bank didn't answer just now
+          Asking your bank…
         </Txt>
       ) : (
         <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 6 }}>
@@ -138,6 +183,28 @@ function BalanceCard({ account }: { account: LinkedAccount }) {
           </Txt>
           <Txt size={24} weight={800} color={color.onDark} tabular style={{ marginBottom: 5 }}>
             {parts.fraction}
+          </Txt>
+        </View>
+      )}
+
+      {weekly !== null && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: 6 }}>
+          <Icon
+            name={weekly >= 0 ? "receive" : "send"}
+            size={13}
+            // Mint is reserved for a positive week and appears nowhere else in
+            // the system, so a negative one must not borrow it.
+            color={weekly >= 0 ? color.gainOnDark : color.onDarkFaint}
+            strokeWidth={2.2}
+          />
+          <Txt
+            size={12}
+            weight={700}
+            color={weekly >= 0 ? color.gainOnDark : color.onDarkFaint}
+            tabular
+          >
+            {formatAmount(Math.abs(weekly), account.currency)}{" "}
+            {weekly >= 0 ? "in" : "out"} this week
           </Txt>
         </View>
       )}
@@ -167,9 +234,22 @@ function OtherAccountRow({ account }: { account: LinkedAccount }) {
         balance.isPending ? (
           <Skeleton height={15} width={72} radius={radius.sm} />
         ) : balance.isError || balance.data === undefined ? (
-          <Txt size={12} weight={500} color={color.inkFaint}>
-            unavailable
-          </Txt>
+          // Fails on its own row with its own retry: one unreachable bank must
+          // never blank the screen or the other balances.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Retry ${account.institutionDisplayName} balance`}
+            onPress={() => void balance.refetch()}
+            hitSlop={8}
+            style={{ alignItems: "flex-end" }}
+          >
+            <Txt size={12} weight={500} color={color.inkFaint}>
+              Bank unreachable
+            </Txt>
+            <Txt size={12} weight={700} color={color.link}>
+              Try again
+            </Txt>
+          </Pressable>
         ) : (
           <Txt size={15} weight={700} tabular>
             {formatAmount(balance.data.balanceMinor, balance.data.currency)}
@@ -177,6 +257,97 @@ function OtherAccountRow({ account }: { account: LinkedAccount }) {
         )
       }
     />
+  );
+}
+
+/**
+ * The first-run state.
+ *
+ * No nocturne card: there is no balance to hold, and the gradient is never an
+ * empty state. It teaches the three steps rather than decorating a void, and
+ * says plainly why the address exists but cannot yet be paid — which is the
+ * same sentence that explains why the product is trustworthy.
+ */
+function FirstRun({ vpa, onConnect }: { vpa: string | undefined; onConnect: () => void }) {
+  const router = useRouter();
+  const steps: Array<[string, string]> = [
+    ["Pick your bank", "21 institutions across 12 countries."],
+    ["Enter your account number", "We verify it with the bank."],
+    ["Send and receive", "Money stays at your bank until it moves."],
+  ];
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.xxl }}
+    >
+      <Txt size={24} weight={800} tracking={-0.02} style={{ marginTop: space.sm }}>
+        Connect a bank to begin
+      </Txt>
+      {vpa !== undefined && (
+        <Txt size={15} weight={500} color={color.inkMuted} leading={1.5} style={{ marginTop: 8 }}>
+          Your address{" "}
+          <Txt size={15} weight={700} tabular>
+            {vpa}
+          </Txt>{" "}
+          is already yours. It can’t receive or send until one of your accounts is linked to it.
+        </Txt>
+      )}
+
+      <View style={{ marginTop: space.xl, gap: space.lg }}>
+        {steps.map(([title, body], index) => (
+          <View key={title} style={{ flexDirection: "row", gap: space.md }}>
+            <View
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                backgroundColor: color.primarySoft,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Txt size={12} weight={800} color={color.link} tabular>
+                {index + 1}
+              </Txt>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Txt size={15} weight={700}>
+                {title}
+              </Txt>
+              <Txt size={13} weight={500} color={color.inkMuted} leading={1.45}>
+                {body}
+              </Txt>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <Button
+        label="Connect an account"
+        icon="plus"
+        style={{ marginTop: space.xl }}
+        onPress={onConnect}
+      />
+
+      <SectionHeader title="Available now" />
+      <Card padded={false} style={{ paddingHorizontal: 14 }}>
+        <ListRow
+          divider
+          leading={<Icon name="user" size={20} color={color.link} strokeWidth={1.9} />}
+          title={vpa ?? "Your address"}
+          subtitle="Your address"
+          trailing={<Pill tone="pending" icon="clock" label="Not yet payable" />}
+        />
+        <ListRow
+          onPress={() => router.push("/contact/add")}
+          leading={<Icon name="peopleAdd" size={20} color={color.link} strokeWidth={1.9} />}
+          title="Save a contact"
+          subtitle="Works before your bank is linked"
+          trailing={<Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />}
+        />
+      </Card>
+    </ScrollView>
   );
 }
 
@@ -196,12 +367,14 @@ export default function HomeScreen() {
   const accounts = useAccounts();
   const feed = useTransactions();
   const unread = useUnreadCount();
+  const keys = useDirectoryKeys();
 
   const user = me.data?.user;
   const list = accounts.data?.accounts ?? [];
   const primary = list.find((a) => a.isDefault) ?? list[0];
   const others = list.filter((a) => a.id !== primary?.id);
   const recent = feed.items.slice(0, 6);
+  const primaryVpa = (keys.data ?? []).find((k) => k.type === "vpa" && k.isPrimary)?.value;
 
   return (
     <Screen edges={{ bottom: false }}>
@@ -244,16 +417,7 @@ export default function HomeScreen() {
       ) : accounts.isPending ? (
         <HomeSkeleton />
       ) : primary === undefined ? (
-        // Inherent to the model: an address is only payable once its owner has
-        // connected a bank. This is the first thing a new user must do.
-        <EmptyState
-          icon="card"
-          title="Connect your bank account"
-          body="CaribPay moves money between banks — it never holds it. Connect an account and your CaribPay address starts working."
-          actionLabel="Connect an account"
-          actionIcon="plus"
-          onAction={() => router.push("/accounts/link")}
-        />
+        <FirstRun vpa={primaryVpa} onConnect={() => router.push("/accounts/link")} />
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingBottom: space.xxl }}
@@ -265,7 +429,11 @@ export default function HomeScreen() {
             />
           }
         >
-          <BalanceCard account={primary} />
+          <BalanceCard
+            account={primary}
+            items={feed.items}
+            feedComplete={!feed.hasNextPage}
+          />
           <QuickActions />
           {others.length > 0 && (
             <>

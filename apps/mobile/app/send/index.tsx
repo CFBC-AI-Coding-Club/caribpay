@@ -64,16 +64,26 @@ export default function SendRecipientScreen() {
 
   if (linked.length === 0) {
     return (
-      <Screen>
+      <Screen edges={{ bottom: false }}>
         <ScreenHeader title="Send money" />
-        <EmptyState
-          icon="card"
-          title="Connect a bank account first"
-          body="CaribPay moves money between banks — it never holds it. Connect the account you want to pay from."
-          actionLabel="Connect an account"
-          actionIcon="plus"
-          onAction={() => router.replace("/accounts/link")}
-        />
+        <View style={{ flex: 1, paddingHorizontal: space.gutter, paddingTop: space.xl }}>
+          <Txt size={24} weight={800} tracking={-0.02}>
+            Sending needs a bank account
+          </Txt>
+          <Txt size={15} weight={500} color={color.inkMuted} leading={1.5} style={{ marginTop: 8 }}>
+            CaribPay instructs your bank to move the money — it never holds it. Link an account and
+            this screen opens straight into your contacts.
+          </Txt>
+        </View>
+        <View style={{ paddingHorizontal: space.gutter, gap: 10 }}>
+          <Button
+            label="Connect an account"
+            icon="plus"
+            onPress={() => router.replace("/accounts/link")}
+          />
+          <Button label="Not now" variant="ghost" height={48} onPress={() => router.back()} />
+        </View>
+        <HomeIndicator />
       </Screen>
     );
   }
@@ -158,9 +168,16 @@ function ContactPicker({
       keyExtractor={(contact) => contact.id}
       contentContainerStyle={{ padding: space.gutter, gap: 10 }}
       renderItem={({ item }) => (
-        <Card padded={false} style={{ paddingHorizontal: 14 }}>
+        <Card
+          padded={false}
+          style={{ paddingHorizontal: 14, opacity: item.currency === null ? 0.55 : 1 }}
+        >
           <ListRow
-            onPress={() => onPick(item.primaryVpa ?? item.savedKey)}
+            onPress={
+              item.currency === null
+                ? undefined
+                : () => onPick(item.primaryVpa ?? item.savedKey)
+            }
             leading={
               <Avatar
                 name={item.displayName}
@@ -172,10 +189,14 @@ function ContactPicker({
             title={item.displayName}
             subtitle={
               item.currency === null
-                ? `${item.primaryVpa ?? item.savedKey} · no bank connected yet`
+                ? "Cannot receive yet"
                 : `${item.primaryVpa ?? item.savedKey} · ${CURRENCY_SYMBOLS[item.currency]}`
             }
-            trailing={<Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />}
+            trailing={
+              item.currency === null ? undefined : (
+                <Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />
+              )
+            }
           />
         </Card>
       )}
@@ -209,7 +230,7 @@ function AddressEntry({
           placeholder="name@caribpay"
           autoCapitalize="none"
           autoCorrect={false}
-          hint="Ask them to open Receive and share their address."
+          hint="An address, a phone number, or an email — whichever they gave you."
         />
 
         <Notice

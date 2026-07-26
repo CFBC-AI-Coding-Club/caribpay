@@ -1,4 +1,4 @@
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { CURRENCY_NAMES, formatAmount, type LinkedAccount } from "@caribpay/shared";
 import { color, radius, space } from "@/theme";
@@ -9,7 +9,6 @@ import {
   EmptyState,
   ErrorState,
   HomeIndicator,
-  ListRow,
   Loading,
   Pill,
   Screen,
@@ -19,31 +18,71 @@ import {
 } from "@/components/ui";
 import { useAccountBalance, useAccounts } from "@/api/hooks";
 
-function AccountRow({ account, divider }: { account: LinkedAccount; divider: boolean }) {
+/**
+ * One card per account, because each bank answers separately: a card can be
+ * live, loading, or unreachable on its own without touching its neighbours.
+ * "Live" is an honest claim here, and the footnote below the list earns it.
+ */
+function AccountCard({ account }: { account: LinkedAccount }) {
   const balance = useAccountBalance(account.id);
   return (
-    <ListRow
-      divider={divider}
-      leading={<Flag currency={account.currency} country={account.countryCode} size={42} />}
-      title={account.institutionDisplayName}
-      subtitle={`${account.accountNumberMasked} · ${CURRENCY_NAMES[account.currency]}`}
-      trailing={
-        <View style={{ alignItems: "flex-end", gap: 4 }}>
-          {balance.isPending ? (
-            <Skeleton height={15} width={80} radius={radius.sm} />
-          ) : balance.data === undefined ? (
-            <Txt size={12} weight={500} color={color.inkFaint}>
-              unavailable
+    <Card style={{ gap: space.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.md }}>
+        <Flag currency={account.currency} country={account.countryCode} size={42} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+            <Txt size={15} weight={700} numberOfLines={1} style={{ flexShrink: 1 }}>
+              {account.institutionDisplayName}
             </Txt>
-          ) : (
-            <Txt size={15} weight={700} tabular>
+            {account.isDefault && <Pill tone="primary" label="Default" />}
+          </View>
+          <Txt size={12} weight={500} color={color.inkMuted} numberOfLines={1}>
+            {account.accountNumberMasked} · {CURRENCY_NAMES[account.currency]}
+          </Txt>
+        </View>
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: space.sm,
+          borderTopWidth: 1,
+          borderTopColor: color.hairlineFaint,
+          paddingTop: space.md,
+        }}
+      >
+        <Txt size={12} weight={600} color={color.inkMuted}>
+          At your bank
+        </Txt>
+        {balance.isPending ? (
+          <Skeleton height={20} width={110} radius={radius.sm} />
+        ) : balance.data === undefined ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Retry ${account.institutionDisplayName} balance`}
+            onPress={() => void balance.refetch()}
+            hitSlop={8}
+            style={{ alignItems: "flex-end" }}
+          >
+            <Txt size={13} weight={600} color={color.inkFaint}>
+              Balance unavailable
+            </Txt>
+            <Txt size={13} weight={700} color={color.link}>
+              Retry
+            </Txt>
+          </Pressable>
+        ) : (
+          <View style={{ alignItems: "flex-end", gap: 4 }}>
+            <Txt size={20} weight={800} tabular>
               {formatAmount(balance.data.balanceMinor, balance.data.currency)}
             </Txt>
-          )}
-          {account.isDefault && <Pill tone="primary" label="Default" />}
-        </View>
-      }
-    />
+            <Pill tone="success" icon="check" label="Live" />
+          </View>
+        )}
+      </View>
+    </Card>
   );
 }
 
@@ -79,15 +118,11 @@ export default function AccountsScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.md }}
         >
-          <Card padded={false} style={{ paddingHorizontal: 14 }}>
-            {list.map((account, index) => (
-              <AccountRow
-                key={account.id}
-                account={account}
-                divider={index < list.length - 1}
-              />
+          <View style={{ gap: 10 }}>
+            {list.map((account) => (
+              <AccountCard key={account.id} account={account} />
             ))}
-          </Card>
+          </View>
           <Txt
             size={12}
             weight={500}

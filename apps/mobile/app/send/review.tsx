@@ -279,6 +279,7 @@ export default function SendReviewScreen() {
 
           <DetailRow label="Fee">
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              {/* Settled green: a zero fee is a good outcome, not a neutral fact. */}
               <Txt size={13} weight={800} color={color.success}>
                 Free
               </Txt>
@@ -319,6 +320,22 @@ export default function SendReviewScreen() {
           </View>
         )}
 
+        {/*
+          The hold explained before the money moves. "Holds" is the honest verb:
+          the money is reserved at the payer's bank and released in full if the
+          other side declines.
+        */}
+        <Txt
+          size={12}
+          weight={500}
+          color={color.inkMuted}
+          leading={1.45}
+          style={{ marginTop: space.md }}
+        >
+          Your bank holds {formatAmount(sourceAmountMinor, sourceCurrency)} now and releases it
+          when {recipient.maskedName.split(" ")[0]}&rsquo;s bank confirms. If that fails, the hold
+          is released in full.
+        </Txt>
       </ScrollView>
 
       {/*

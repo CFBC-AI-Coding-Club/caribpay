@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, View, type StyleProp, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -167,20 +167,33 @@ export function SheetScreen({
   );
 }
 
-/** The iOS home-indicator pill the board draws at the foot of every screen. */
+/**
+ * The gesture-bar stand-in the board draws at the foot of every screen.
+ *
+ * Per-platform because the two systems draw a visibly different pill, and an
+ * iOS-shaped one on Android is exactly the "ported from another OS" tell that
+ * makes an app feel foreign. Only rendered when the OS is not already
+ * reserving space for a real gesture bar.
+ */
 export function HomeIndicator({ onDark = false }: { onDark?: boolean }) {
   const insets = useSafeAreaInsets();
-  // Devices with a real gesture bar draw their own; only render the stand-in
-  // when the OS is not already reserving space for one.
   if (insets.bottom > 0) return <View style={{ height: space.sm }} />;
+
+  const android = Platform.OS === "android";
   return (
-    <View style={{ alignItems: "center", paddingTop: space.sm, paddingBottom: 10 }}>
+    <View style={{ alignItems: "center", paddingTop: space.sm, paddingBottom: android ? 8 : 10 }}>
       <View
         style={{
-          width: 134,
-          height: 5,
-          borderRadius: 3,
-          backgroundColor: onDark ? color.homeIndicatorOnDark : color.homeIndicator,
+          width: android ? 108 : 140,
+          height: android ? 4 : 5,
+          borderRadius: android ? 2 : 3,
+          backgroundColor: onDark
+            ? android
+              ? color.homeIndicatorOnDarkAndroid
+              : color.homeIndicatorOnDark
+            : android
+              ? color.homeIndicatorAndroid
+              : color.homeIndicator,
         }}
       />
     </View>

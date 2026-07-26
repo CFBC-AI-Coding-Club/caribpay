@@ -3,7 +3,8 @@ import { useRouter } from "expo-router";
 import { color, space } from "@/theme";
 import { Button, HomeIndicator, Screen, Txt } from "@/components/ui";
 
-const MARQUEE = ["Send", "Receive", "Save", "Convert"];
+// "Save" and "Convert" described the wallet. The switch does neither.
+const MARQUEE = ["Send", "Receive", "Scan", "Connect"];
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function WelcomeScreen() {
             {"One region.\nOne payment."}
           </Txt>
           <Txt size={15} weight={500} color={color.onDarkMuted} leading={1.5} style={{ marginTop: 14 }}>
-            Move money across the islands in seconds — little to no fees, and no US dollar required.
+            Move money across the islands in seconds — no fees, and no US dollar in the route.
           </Txt>
         </View>
         <View style={{ gap: space.md }}>

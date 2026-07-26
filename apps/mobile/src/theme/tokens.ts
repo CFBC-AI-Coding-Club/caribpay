@@ -78,9 +78,15 @@ export const color = {
   disabledSurface: "#F4F2FA",
   disabledSurfaceText: "#A5A0BD",
 
-  /** iOS-style home indicator pill. */
+  /**
+   * Gesture-bar stand-ins, drawn only when the OS is not already reserving
+   * space for one. The two platforms draw a visibly different pill and the
+   * board specifies both: iOS 140x5 at 22%, Android 108x4 at 34%.
+   */
   homeIndicator: "rgba(26,19,64,0.22)",
+  homeIndicatorAndroid: "rgba(26,19,64,0.34)",
   homeIndicatorOnDark: "rgba(255,255,255,0.40)",
+  homeIndicatorOnDarkAndroid: "rgba(255,255,255,0.55)",
 
   // On-dark text and surfaces (over the deep gradient)
   onDark: "#FFFFFF",

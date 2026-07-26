@@ -71,7 +71,7 @@ export default function RegisterScreen() {
             Create your account
           </Txt>
           <Txt size={15} weight={500} color={color.onDarkMuted} style={{ marginTop: 6 }}>
-            One address. Every island.
+            Two minutes. No fees, ever.
           </Txt>
         </View>
       }
@@ -145,7 +145,7 @@ export default function RegisterScreen() {
             tone="primary"
             icon="info"
             title="You'll get a CaribPay address"
-            body="Connect your bank account afterwards and the address starts working — CaribPay moves the money, your bank keeps it."
+            body="Something like amara@caribpay. Connect a bank afterwards and it starts working."
           />
 
           <Button
@@ -178,7 +178,7 @@ export default function RegisterScreen() {
 
       <PickerSheet
         visible={pickerOpen}
-        title="Where do you live?"
+        title="Where do you bank?"
         options={COUNTRY_OPTIONS}
         value={country}
         onSelect={setCountry}

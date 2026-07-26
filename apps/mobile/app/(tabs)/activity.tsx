@@ -6,6 +6,7 @@ import { color, radius, space, TOUCH_TARGET } from "@/theme";
 import {
   Button,
   EmptyState,
+  Pill,
   ErrorState,
   FilterChips,
   groupedRowStyle,
@@ -39,6 +40,59 @@ function matches(tx: Transaction, filter: Filter): boolean {
     case "pending":
       return !isTerminalStatus(tx.status);
   }
+}
+
+/**
+ * No matches for the filter — distinct from having no transfers at all.
+ *
+ * It answers the question the filter was asking (nothing is stuck) and gives the
+ * counts, rather than putting an icon in a tile. "Pending" is the filter people
+ * reach for when they are worried, so it gets the most reassuring answer.
+ */
+function FilterEmpty({
+  filter,
+  all,
+  onShowAll,
+}: {
+  filter: Filter;
+  all: Transaction[];
+  onShowAll: () => void;
+}) {
+  const delivered = all.filter((t) => t.status === "completed").length;
+  const returned = all.filter((t) => t.status === "reversed" || t.status === "failed").length;
+
+  const copy: Record<Exclude<Filter, "all">, { title: string; body: string }> = {
+    pending: {
+      title: "Nothing in flight",
+      body: `Every one of your ${all.length} transfers has settled. Pending only fills while two banks are still talking — usually seconds.`,
+    },
+    sent: { title: "Nothing sent yet", body: "Transfers you send will be listed here." },
+    received: {
+      title: "Nothing received yet",
+      body: "Share your CaribPay address and arrivals will be listed here.",
+    },
+  };
+  const { title, body } = copy[filter as Exclude<Filter, "all">] ?? copy.pending;
+
+  return (
+    <View style={{ flex: 1, paddingHorizontal: space.gutter, paddingTop: space.xl, gap: space.lg }}>
+      <View style={{ gap: 8 }}>
+        <Txt size={20} weight={800} tracking={-0.01}>
+          {title}
+        </Txt>
+        <Txt size={15} weight={500} color={color.inkMuted} leading={1.5}>
+          {body}
+        </Txt>
+      </View>
+
+      <View style={{ flexDirection: "row", gap: space.sm }}>
+        <Pill tone="success" icon="check" label={`${delivered} delivered`} size={13} />
+        {returned > 0 && <Pill tone="error" icon="close" label={`${returned} returned`} size={13} />}
+      </View>
+
+      <Button label="Show all transfers" variant="secondary" onPress={onShowAll} />
+    </View>
+  );
 }
 
 /** Group consecutive rows under Today / Yesterday / month headings, in SectionList shape. */
@@ -115,14 +169,7 @@ export default function ActivityScreen() {
           onAction={() => router.push("/send")}
         />
       ) : visible.length === 0 ? (
-        <EmptyState
-          icon="filter"
-          tone="muted"
-          title="Nothing here"
-          body="No transfers match this filter yet. Try another one."
-          actionLabel="Show all"
-          onAction={() => setFilter("all")}
-        />
+        <FilterEmpty filter={filter} all={all} onShowAll={() => setFilter("all")} />
       ) : (
         <SectionList
           sections={groups}

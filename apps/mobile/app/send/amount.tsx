@@ -6,6 +6,7 @@ import {
   CURRENCY_SYMBOLS,
   formatAmount,
   formatRate,
+  fromMinor,
   groupDigits,
   toMinor,
   type Currency,
@@ -197,29 +198,35 @@ export default function SendAmountScreen() {
             <Txt size={13} weight={600} color={color.inkMuted}>
               They receive
             </Txt>
+            {/* Locked, not pressable: the payee's account decides this. */}
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                backgroundColor: color.tintRow,
+                backgroundColor: color.neutralSoft,
+                borderWidth: 1,
+                borderColor: color.borderSoft,
                 paddingHorizontal: 10,
                 paddingVertical: 6,
                 borderRadius: radius.pill,
               }}
             >
               <Flag currency={recipient.currency} country={recipient.countryCode} size={18} />
-              <Txt size={13} weight={700}>
+              <Txt size={13} weight={700} color={color.inkOnTint}>
                 {CURRENCY_SYMBOLS[recipient.currency]}
               </Txt>
+              <Icon name="lock" size={12} color={color.inkSubtle} strokeWidth={2} />
             </View>
           </View>
           <Txt size={31} weight={800} color={color.link} tabular numberOfLines={1} style={{ marginTop: 4 }}>
-            {destAmountMinor === undefined || destAmountMinor === null
-              ? quote.isFetching
-                ? "…"
-                : `${CURRENCY_SYMBOLS[recipient.currency]}0.00`
-              : formatAmount(destAmountMinor, recipient.currency)}
+            {overBalance
+              ? "—"
+              : destAmountMinor === undefined || destAmountMinor === null
+                ? quote.isFetching
+                  ? "…"
+                  : `${CURRENCY_SYMBOLS[recipient.currency]}0.00`
+                : formatAmount(destAmountMinor, recipient.currency)}
           </Txt>
         </View>
 
@@ -248,16 +255,61 @@ export default function SendAmountScreen() {
           </View>
         </View>
 
+        {sourceCurrency !== undefined && available !== undefined && !overBalance && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: space.gutter,
+              paddingTop: space.md,
+              gap: space.sm,
+            }}
+          >
+            <Txt size={13} weight={500} color={color.inkMuted} tabular>
+              At your bank: {formatAmount(available, sourceCurrency)}
+            </Txt>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Send the whole available balance"
+              hitSlop={8}
+              onPress={() => draft.setAmount(fromMinor(available, sourceCurrency))}
+            >
+              <Txt size={13} weight={700} color={color.link}>
+                Send all
+              </Txt>
+            </Pressable>
+          </View>
+        )}
+
         {overBalance && sourceCurrency !== undefined && available !== undefined && (
-          <View style={{ paddingHorizontal: space.gutter, paddingTop: space.md }}>
+          <View style={{ paddingHorizontal: space.gutter, paddingTop: space.md, gap: space.sm }}>
             <Notice
               tone="error"
               title="More than your bank has available"
-              body={`Your ${sourceAccount?.institutionDisplayName} account has ${formatAmount(
+              body={`That is more than the ${formatAmount(
                 available,
                 sourceCurrency,
-              )} available right now.`}
+              )} your bank reports. Try a smaller amount or switch account.`}
             />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button
+                label={`Send all · ${formatAmount(available, sourceCurrency, { symbol: false })}`}
+                variant="secondary"
+                height={48}
+                style={{ flex: 1, paddingHorizontal: space.md }}
+                onPress={() => draft.setAmount(fromMinor(available, sourceCurrency))}
+              />
+              {linked.length > 1 && (
+                <Button
+                  label="Switch account"
+                  variant="secondary"
+                  height={48}
+                  style={{ flex: 1, paddingHorizontal: space.md }}
+                  onPress={() => setPickerOpen(true)}
+                />
+              )}
+            </View>
           </View>
         )}
 
