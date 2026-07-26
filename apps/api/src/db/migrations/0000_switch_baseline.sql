@@ -3,6 +3,7 @@ CREATE TYPE "public"."directory_key_type" AS ENUM('vpa', 'phone', 'email');--> s
 CREATE TYPE "public"."kyc_status" AS ENUM('unverified', 'pending', 'verified');--> statement-breakpoint
 CREATE TYPE "public"."ledger_direction" AS ENUM('debit', 'credit');--> statement-breakpoint
 CREATE TYPE "public"."linked_account_status" AS ENUM('active', 'suspended', 'closed');--> statement-breakpoint
+CREATE TYPE "public"."notification_type" AS ENUM('transfer_received', 'transfer_failed', 'transfer_reversed');--> statement-breakpoint
 CREATE TYPE "public"."psp_status" AS ENUM('active', 'planned');--> statement-breakpoint
 CREATE TYPE "public"."system_account_type" AS ENUM('fx_liquidity', 'settlement_clearing', 'fee_revenue', 'bank_position');--> statement-breakpoint
 CREATE TYPE "public"."transaction_status" AS ENUM('initiated', 'debit_pending', 'debit_held', 'credit_pending', 'completed', 'failed', 'reversal_pending', 'reversed');--> statement-breakpoint
@@ -100,6 +101,17 @@ CREATE TABLE "linked_accounts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"type" "notification_type" NOT NULL,
+	"title" text NOT NULL,
+	"body" text NOT NULL,
+	"data" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"read_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "refresh_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -108,6 +120,24 @@ CREATE TABLE "refresh_tokens" (
 	"revoked_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "settlement_cycle_entries" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"cycle_id" uuid NOT NULL,
+	"institution_id" uuid NOT NULL,
+	"currency" "currency" NOT NULL,
+	"net_position_minor" bigint NOT NULL,
+	"gross_in_minor" bigint DEFAULT 0 NOT NULL,
+	"gross_out_minor" bigint DEFAULT 0 NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "settlement_cycles" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"transaction_id" uuid,
+	"transfer_count" integer DEFAULT 0 NOT NULL,
+	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"completed_at" timestamp with time zone
 );
 --> statement-breakpoint
 CREATE TABLE "system_accounts" (
@@ -170,7 +200,11 @@ ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_transaction_id_trans
 ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_system_account_id_system_accounts_id_fk" FOREIGN KEY ("system_account_id") REFERENCES "public"."system_accounts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "linked_accounts" ADD CONSTRAINT "linked_accounts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "linked_accounts" ADD CONSTRAINT "linked_accounts_institution_id_institutions_id_fk" FOREIGN KEY ("institution_id") REFERENCES "public"."institutions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_cycle_entries" ADD CONSTRAINT "settlement_cycle_entries_cycle_id_settlement_cycles_id_fk" FOREIGN KEY ("cycle_id") REFERENCES "public"."settlement_cycles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_cycle_entries" ADD CONSTRAINT "settlement_cycle_entries_institution_id_institutions_id_fk" FOREIGN KEY ("institution_id") REFERENCES "public"."institutions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settlement_cycles" ADD CONSTRAINT "settlement_cycles_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."transactions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "system_accounts" ADD CONSTRAINT "system_accounts_institution_id_institutions_id_fk" FOREIGN KEY ("institution_id") REFERENCES "public"."institutions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_sender_user_id_users_id_fk" FOREIGN KEY ("sender_user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_recipient_user_id_users_id_fk" FOREIGN KEY ("recipient_user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -186,6 +220,9 @@ CREATE INDEX "ledger_entries_account_idx" ON "ledger_entries" USING btree ("syst
 CREATE UNIQUE INDEX "linked_accounts_institution_ref_uq" ON "linked_accounts" USING btree ("institution_id","account_ref");--> statement-breakpoint
 CREATE INDEX "linked_accounts_user_idx" ON "linked_accounts" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "linked_accounts_one_default_uq" ON "linked_accounts" USING btree ("user_id") WHERE "linked_accounts"."is_default" AND "linked_accounts"."status" = 'active';--> statement-breakpoint
+CREATE INDEX "notifications_user_created_idx" ON "notifications" USING btree ("user_id","created_at");--> statement-breakpoint
+CREATE INDEX "notifications_unread_idx" ON "notifications" USING btree ("user_id") WHERE "notifications"."read_at" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "settlement_entries_cycle_inst_ccy_uq" ON "settlement_cycle_entries" USING btree ("cycle_id","institution_id","currency");--> statement-breakpoint
 CREATE UNIQUE INDEX "system_accounts_global_type_currency_uq" ON "system_accounts" USING btree ("type","currency") WHERE "system_accounts"."institution_id" IS NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "system_accounts_bank_position_uq" ON "system_accounts" USING btree ("type","currency","institution_id") WHERE "system_accounts"."institution_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "transactions_sender_idx" ON "transactions" USING btree ("sender_user_id","created_at");--> statement-breakpoint

@@ -14,7 +14,8 @@
     "db:seed:demo": "bun run --cwd apps/api db:seed:demo",
     "db:migrate:bank": "bun run --cwd apps/mock-bank db:migrate",
     "db:seed:bank": "bun run --cwd apps/mock-bank db:seed",
-    "reconcile": "bun run --cwd apps/api reconcile"
+    "reconcile": "bun run --cwd apps/api reconcile",
+    "settle": "bun run --cwd apps/api settle"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

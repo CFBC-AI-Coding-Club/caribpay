@@ -1,81 +1,106 @@
 import { and, desc, eq } from "drizzle-orm";
-import type { Contact, Currency } from "@caribpay/shared";
+import type { Contact, CreateContactRequest } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
-import { contacts, users, wallets } from "../db/schema";
+import { contacts, institutions, linkedAccounts, users } from "../db/schema";
 import { ApiError } from "../lib/errors";
 import { isUniqueViolation } from "../lib/pg-errors";
-
-type ContactRow = typeof contacts.$inferSelect;
+import { primaryVpaFor, resolveKey } from "./directory";
 
 /**
- * Contact rows store only the address, but the UI shows the wallet's currency
- * and a flag for the contact's country — so both are joined in on read.
+ * Saved counterparties.
+ *
+ * The durable link is `contact_user_id`; the address is resolved fresh on every
+ * read. A contact therefore keeps working after its owner changes their handle,
+ * which a stored address would not.
  */
-function toPublicContact(
-  row: ContactRow,
-  currency: Currency,
-  countryCode: string,
-): Contact {
-  return {
-    id: row.id,
-    contactUserId: row.contactUserId,
-    walletAddress: row.walletAddress,
-    displayName: row.displayName,
-    currency,
-    countryCode,
-    pinned: row.pinned,
-    createdAt: row.createdAt.toISOString(),
-  };
+export async function listContacts(dbh: DbHandle, ownerUserId: string): Promise<Contact[]> {
+  const rows = await dbh
+    .select({ contact: contacts, user: users })
+    .from(contacts)
+    .innerJoin(users, eq(users.id, contacts.contactUserId))
+    .where(eq(contacts.ownerUserId, ownerUserId))
+    .orderBy(desc(contacts.pinned), contacts.displayName);
+
+  const out: Contact[] = [];
+  for (const row of rows) {
+    out.push({
+      id: row.contact.id,
+      contactUserId: row.contact.contactUserId,
+      savedKey: row.contact.savedKey,
+      primaryVpa: await primaryVpaFor(dbh, row.contact.contactUserId),
+      displayName: row.contact.displayName,
+      currency: await defaultCurrencyFor(dbh, row.contact.contactUserId),
+      countryCode: row.user.countryCode,
+      pinned: row.contact.pinned,
+      createdAt: row.contact.createdAt.toISOString(),
+    });
+  }
+  return out;
+}
+
+/** The currency of the account their keys route to, or null if unlinked. */
+async function defaultCurrencyFor(dbh: DbHandle, userId: string) {
+  const [row] = await dbh
+    .select({ currency: linkedAccounts.currency })
+    .from(linkedAccounts)
+    .where(
+      and(
+        eq(linkedAccounts.userId, userId),
+        eq(linkedAccounts.isDefault, true),
+        eq(linkedAccounts.status, "active"),
+      ),
+    );
+  return row?.currency ?? null;
 }
 
 export async function createContact(
   dbh: DbHandle,
   ownerUserId: string,
-  walletAddress: string,
-  displayName: string,
-  pinned = false,
+  input: CreateContactRequest,
 ): Promise<Contact> {
-  const [target] = await dbh
-    .select({
-      userId: wallets.userId,
-      currency: wallets.currency,
-      countryCode: users.countryCode,
-    })
-    .from(wallets)
-    .innerJoin(users, eq(users.id, wallets.userId))
-    .where(eq(wallets.address, walletAddress));
-  if (target === undefined) {
-    throw new ApiError(404, "ADDRESS_NOT_FOUND", "No wallet found for that address");
-  }
-  if (target.userId === ownerUserId) {
-    throw new ApiError(422, "SELF_CONTACT", "You cannot add your own wallet as a contact");
-  }
+  const resolved = await resolveKey(dbh, ownerUserId, input.key);
   try {
     const [row] = await dbh
       .insert(contacts)
-      .values({ ownerUserId, contactUserId: target.userId, walletAddress, displayName, pinned })
+      .values({
+        ownerUserId,
+        contactUserId: resolved.userId,
+        savedKey: resolved.key,
+        displayName: input.displayName,
+        pinned: input.pinned,
+      })
       .returning();
-    return toPublicContact(row!, target.currency, target.countryCode);
+    const [user] = await dbh
+      .select({ countryCode: users.countryCode })
+      .from(users)
+      .where(eq(users.id, resolved.userId));
+    return {
+      id: row!.id,
+      contactUserId: row!.contactUserId,
+      savedKey: row!.savedKey,
+      primaryVpa: resolved.primaryVpa,
+      displayName: row!.displayName,
+      currency: resolved.currency,
+      countryCode: user?.countryCode ?? resolved.countryCode,
+      pinned: row!.pinned,
+      createdAt: row!.createdAt.toISOString(),
+    };
   } catch (error) {
-    if (isUniqueViolation(error, "contacts_owner_address_uq")) {
-      throw new ApiError(409, "CONTACT_EXISTS", "This address is already in your contacts");
+    if (isUniqueViolation(error, "contacts_owner_contact_uq")) {
+      throw new ApiError(409, "CONTACT_EXISTS", "You have already saved them");
     }
     throw error;
   }
 }
 
-export async function listContacts(dbh: DbHandle, ownerUserId: string): Promise<Contact[]> {
-  const rows = await dbh
-    .select({
-      contact: contacts,
-      currency: wallets.currency,
-      countryCode: users.countryCode,
-    })
-    .from(contacts)
-    .innerJoin(wallets, eq(wallets.address, contacts.walletAddress))
-    .innerJoin(users, eq(users.id, contacts.contactUserId))
-    .where(eq(contacts.ownerUserId, ownerUserId))
-    // Pinned first so the client can slice the "Quick send" row off the top.
-    .orderBy(desc(contacts.pinned), desc(contacts.createdAt));
-  return rows.map((r) => toPublicContact(r.contact, r.currency, r.countryCode));
+/** Institutions are needed by the contact screen's flag/labels; kept together. */
+export async function institutionDisplayName(
+  dbh: DbHandle,
+  institutionId: string,
+): Promise<string | null> {
+  const [row] = await dbh
+    .select({ displayName: institutions.displayName })
+    .from(institutions)
+    .where(eq(institutions.id, institutionId));
+  return row?.displayName ?? null;
 }

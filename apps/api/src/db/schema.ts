@@ -19,6 +19,7 @@ import {
   DIRECTORY_KEY_TYPES,
   KYC_STATUSES,
   LINKED_ACCOUNT_STATUSES,
+  NOTIFICATION_TYPES,
   PSP_STATUSES,
   SUPPORTED_CURRENCIES,
   TRANSACTION_TYPES,
@@ -33,6 +34,7 @@ export const ledgerDirectionEnum = pgEnum("ledger_direction", ["debit", "credit"
 export const pspStatusEnum = pgEnum("psp_status", PSP_STATUSES);
 export const directoryKeyTypeEnum = pgEnum("directory_key_type", DIRECTORY_KEY_TYPES);
 export const linkedAccountStatusEnum = pgEnum("linked_account_status", LINKED_ACCOUNT_STATUSES);
+export const notificationTypeEnum = pgEnum("notification_type", NOTIFICATION_TYPES);
 
 /**
  * Clearing accounts. `bank_position` is one per member bank per currency and
@@ -348,4 +350,67 @@ export const contacts = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex("contacts_owner_contact_uq").on(t.ownerUserId, t.contactUserId)],
+);
+
+/**
+ * What the recipient needs to know.
+ *
+ * The row is written inside the same DB transaction as the status flip it
+ * describes, so if the money moved the notification exists. There is no
+ * best-effort second write to lose.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    type: notificationTypeEnum("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    data: jsonb("data").notNull().default(sql`'{}'::jsonb`),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("notifications_user_created_idx").on(t.userId, t.createdAt),
+    index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} IS NULL`),
+  ],
+);
+
+/**
+ * A net settlement run.
+ *
+ * The credit to a payee is instant and irrevocable; settlement between the banks
+ * is deferred and netted. One instruction replaces every transfer in the window,
+ * which is the whole economic argument for a switch.
+ */
+export const settlementCycles = pgTable("settlement_cycles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** The clearing transaction whose entries returned positions to zero. */
+  transactionId: uuid("transaction_id").references(() => transactions.id),
+  transferCount: integer("transfer_count").notNull().default(0),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+/** One bank's net obligation in one currency for one cycle. */
+export const settlementCycleEntries = pgTable(
+  "settlement_cycle_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    cycleId: uuid("cycle_id")
+      .notNull()
+      .references(() => settlementCycles.id),
+    institutionId: uuid("institution_id")
+      .notNull()
+      .references(() => institutions.id),
+    currency: currencyEnum("currency").notNull(),
+    /** Negative means the bank owes the network; positive means it is owed. */
+    netPositionMinor: bigint("net_position_minor", { mode: "number" }).notNull(),
+    grossInMinor: bigint("gross_in_minor", { mode: "number" }).notNull().default(0),
+    grossOutMinor: bigint("gross_out_minor", { mode: "number" }).notNull().default(0),
+  },
+  (t) => [uniqueIndex("settlement_entries_cycle_inst_ccy_uq").on(t.cycleId, t.institutionId, t.currency)],
 );
