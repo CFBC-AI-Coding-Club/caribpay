@@ -1,8 +1,10 @@
 # CaribPay — Project Constitution
 
-**Project:** CaribPay — a regional payment interoperability platform for the Caribbean. Consumer-facing wallet app riding atop CAPSS (Caribbean Payment and Settlement System). Multi-currency (XCD, JMD, BBD, TTD, USD), instant cross-island wallet-to-wallet transfers, QR-based receive/pay.
+**Project:** CaribPay — a **payment switch** for the Caribbean: the messaging and clearing layer between member banks, in the mould of UPI and PAPSS. It is **not a wallet** and never holds customer money. Multi-currency (XCD, JMD, BBD, TTD, USD), instant cross-island transfers addressed by a human-readable address (`amara@caribpay`), phone, email, or signed QR.
 
-**Context:** This is a Phase 2 prototype for the CANTO Innovation Challenge 2026 (judging Aug 26–27). Goal: working infrastructure and a demoable end-to-end money movement flow. Not production; but the ledger must be architecturally honest — no shortcuts that would embarrass us in technical Q&A.
+**Context:** This is a Phase 2 prototype for the CANTO Innovation Challenge 2026 (judging Aug 26–27). Goal: working infrastructure and a demoable end-to-end money movement flow. Not production; but the clearing ledger and the bank connections must be architecturally honest — no shortcuts that would embarrass us in technical Q&A.
+
+**Never use the name CAPSS.** We are building the settlement system, not integrating with someone else's.
 
 ## Stack (non-negotiable)
 
@@ -11,13 +13,13 @@
 | Runtime | Bun (latest stable) |
 | API framework | Hono |
 | ORM | Drizzle ORM + drizzle-kit migrations |
-| Database | PostgreSQL 16 |
+| Database | PostgreSQL 16 — **two databases**: `caribpay` (switch) and `caribpay_bank` (member banks) |
 | Queue/cache | Redis 7 + BullMQ (`maxmemory-policy noeviction`) |
 | Validation | Zod (shared package, single source of truth) |
 | Mobile | React Native via Expo (latest SDK), expo-router, TypeScript strict |
 | Mobile data | TanStack Query (server state), Zustand (client state) |
 | Auth | JWT access (15 min) + rotating refresh tokens (30 d), `Bun.password` (argon2id) |
-| Local dev | Docker Compose (postgres + redis only; API runs on host via Bun) |
+| Local dev | Docker Compose (postgres + redis only; services run on host via Bun) |
 | Deploy target | Ubuntu VPS, pm2, Caddy reverse proxy, GitHub Actions CI/CD |
 
 ## Repository layout (Bun workspaces monorepo)
@@ -26,197 +28,185 @@
 caribpay/
 ├── CLAUDE.md
 ├── package.json              # workspaces: ["apps/*", "packages/*"]
-├── docker-compose.yml        # postgres + redis for local dev
-├── .github/workflows/ci.yml
+├── docker-compose.yml        # postgres + redis; init creates both databases
 ├── apps/
-│   ├── api/                  # Bun + Hono
-│   │   ├── src/
-│   │   │   ├── index.ts      # server entry
-│   │   │   ├── routes/       # one file per resource
-│   │   │   ├── services/     # business logic (ledger, fx, transfers)
-│   │   │   ├── settlement/   # SettlementProvider interface + MockCapssProvider
-│   │   │   ├── workers/      # BullMQ workers
-│   │   │   ├── db/           # drizzle schema, client, migrations
-│   │   │   └── middleware/   # auth, error handler, request-id
-│   │   └── drizzle.config.ts
+│   ├── api/                  # THE SWITCH — Bun + Hono
+│   │   └── src/
+│   │       ├── routes/       # one file per resource
+│   │       ├── services/     # directory, accounts, transfers, clearing, notifications
+│   │       ├── banks/        # BankConnector interface + HTTP implementation
+│   │       ├── settlement/   # OUR netting engine (not someone else's rail)
+│   │       ├── workers/      # transfer saga + recovery sweeper
+│   │       ├── db/           # drizzle schema, migrations, seeds, reconcile
+│   │       └── middleware/   # auth, idempotency, rate-limit, error handler
+│   ├── mock-bank/            # THE MEMBER BANKS — separate app, separate database
+│   │   └── src/              # accounts, holds, debits, credits
 │   └── mobile/               # Expo app
-│       ├── app/              # expo-router file-based routes
-│       ├── src/
-│       │   ├── api/          # typed client using packages/shared schemas
-│       │   ├── components/
-│       │   └── stores/       # zustand
-│       └── app.json
 └── packages/
-    └── shared/               # zod schemas, types, currency utils, constants
-        └── src/
-            ├── schemas/      # request/response zod schemas per resource
-            ├── currency.ts   # minor-unit math, formatting
-            └── constants.ts  # supported currencies, transfer states
+    └── shared/               # zod schemas, vpa logic, currency utils, institutions
 ```
 
 ## Engineering rules
 
 1. **TypeScript strict everywhere.** No `any` without an inline justification comment.
 2. **All money is integers in minor units** (cents). Never floats. `packages/shared/currency.ts` is the only place arithmetic/formatting on money happens.
-3. **Every API request and response shape is a Zod schema in `packages/shared`** — the API validates with it, the mobile client parses with it. Never define a shape twice.
-4. **The ledger is append-only.** No UPDATE or DELETE on `ledger_entries`, ever. Balances are derived, never stored as a mutable column (a cached balance table is allowed but must be reconcilable from entries).
-5. **Every money-moving endpoint requires an idempotency key** (`Idempotency-Key` header, persisted, replayed responses on duplicates).
+3. **Every API request and response shape is a Zod schema in `packages/shared`** — including the switch↔bank wire contract. Never define a shape twice.
+4. **The clearing ledger is append-only.** No UPDATE or DELETE on `ledger_entries`, ever, enforced by a Postgres trigger. Positions are derived, never stored as a mutable column.
+5. **Every money-moving endpoint requires an idempotency key**, persisted and replayed on duplicates. **The key is claimed by INSERT before the handler runs** — check-then-act is a race that lets concurrent retries all execute.
 6. **Errors:** central Hono error handler; consistent envelope `{ error: { code, message } }`; never leak stack traces.
 7. **Commits:** conventional commits, one commit per completed sub-task.
 8. Prefer boring, readable code over clever code. This will be maintained by four students under deadline.
 
-## Local environment note
+## The rules that make this a switch
 
-**See [RUNNING.md](RUNNING.md) for the full machine-specific runbook** — startup order, phone
-connectivity, demo accounts, and a troubleshooting table. The essentials:
+These are not style preferences. Breaking one changes what the product legally is, or loses someone's money.
 
-Docker on this machine runs inside WSL2 Ubuntu (no Docker Desktop). The PowerShell `docker` command is a shim that forwards to WSL; published ports are reachable from Windows at `localhost`. The redis container maps to host port 6380 here (native WSL redis owns 6379) — see the root `.env`.
-
-**Run `bun test` through WSL on this machine** (`wsl -d Ubuntu -- bash -lc "cd /mnt/c/Users/fraim/Projects/caribpay && ~/.bun/bin/bun test"`): Bun for Windows (≤1.3.14) hangs or segfaults in bun:test under postgres connection churn. Everything else — the API server, `db:migrate`, `db:seed`, `reconcile`, Metro — runs fine on Windows. Linux/macOS teammates and CI are unaffected.
-
-**Before debugging any DB failure, check that WSL is alive:** `(Get-Process wsl).Count`. With no persistent `wsl.exe`, WSL tears down the distro ~10 s after the last command exits and takes dockerd + both containers with it, which surfaces as `ERR_POSTGRES_CONNECTION_CLOSED` mid-query, `ECONNREFUSED` on redis, or `db:migrate` failing on `CREATE SCHEMA` — all easily misread as driver bugs. Fix with `Start-ScheduledTask -TaskName "WSL2-Docker-Keepalive"`.
+1. **CaribPay holds no customer money.** No column in the `caribpay` database may hold a customer balance; `apps/api/test/schema.test.ts` fails if one appears. This is what makes us a payment initiation and clearing operator rather than an e-money issuer.
+2. **The switch reaches customer accounts only over HTTP, through `BankConnector`.** It has no credentials for `caribpay_bank`. Direct SQL across that boundary is forbidden.
+3. **Idempotency keys sent to a bank are derived, never generated:** `` `${transactionId}:${step}` ``, from `packages/shared/idempotency.ts`. A retry must replay, not repeat. Adding randomness, a timestamp, or an attempt counter here reintroduces double-spend.
+4. **A refusal is actionable; an unknown is not.** `BankRefusedError` (a code in `BANK_REFUSAL_CODES`) means the bank says it did not happen — safe to fail or reverse. Anything else — timeout, 5xx, in-flight — is `BankUnknownError`: re-send the identical instruction. **Never reverse on an unknown credit**; it may have landed, and releasing would leave the switch short.
+5. **Recovery drives forward, never back.** Past the credit the money has irrevocably reached the payee.
+6. **A released directory key is never reissued**, to anyone. Uniqueness on value and skeleton is global, covering released rows.
 
 ---
 
 # Architecture Overview
 
 ```
-┌─────────────┐        HTTPS/JSON        ┌──────────────────────────┐
-│ Expo mobile │ ───────────────────────► │ Hono API (Bun)           │
-│ (RN, TS)    │ ◄─── TanStack Query ──── │  ├─ auth (JWT)           │
-└─────────────┘                          │  ├─ wallets / balances   │
-                                         │  ├─ transfers            │
-                                         │  ├─ fx quotes            │
-                                         │  └─ qr payloads          │
-                                         └───────┬──────────┬───────┘
-                                                 │          │
-                                          Drizzle│          │BullMQ
-                                                 ▼          ▼
-                                         ┌───────────┐  ┌──────────────────┐
-                                         │ Postgres  │  │ Redis + workers  │
-                                         │ (ledger)  │  │ settlement queue │
-                                         └───────────┘  └────────┬─────────┘
-                                                                 ▼
-                                                    ┌────────────────────────┐
-                                                    │ SettlementProvider     │
-                                                    │  └ MockCapssProvider   │
-                                                    │    (future: real CAPSS)│
-                                                    └────────────────────────┘
+┌─────────────┐      HTTPS/JSON       ┌──────────────────────────┐     HTTP     ┌────────────────┐
+│ Expo mobile │ ────────────────────► │ apps/api  (the switch)   │ ───────────► │ apps/mock-bank │
+│ (RN, TS)    │ ◄── TanStack Query ── │  ├─ auth (JWT)           │ ◄─────────── │  accounts      │
+└─────────────┘                       │  ├─ directory (VPA)      │  BankConnector│  holds         │
+                                      │  ├─ linked accounts      │              │  debits        │
+                                      │  ├─ transfers (saga)     │              │  credits       │
+                                      │  ├─ clearing + netting   │              └───────┬────────┘
+                                      │  └─ fx quotes            │                      │
+                                      └────┬──────────────┬──────┘                      ▼
+                                    Drizzle│              │BullMQ              caribpay_bank (PG)
+                                           ▼              ▼                    ← no switch access
+                                   caribpay (PG)   Redis + workers
+                                   clearing ledger  saga + recovery sweeper
+                                   NO customer balances
 ```
 
-**Transfer lifecycle (the demo centerpiece):**
-`initiated` → (ledger holds debited) → `pending_settlement` → (BullMQ job, 2–5 s simulated CAPSS delay) → `settled` (credit posted) — or → `failed` (hold reversed). The mobile app shows this transition live via polling (TanStack Query refetch interval on the transfer detail; WebSockets are out of scope for this phase).
+**Transfer lifecycle (the demo centrepiece):**
+
+```
+initiated → debit_pending → debit_held → credit_pending → completed
+                    ↘ failed                    ↘ reversal_pending → reversed
+```
+
+1. Resolve the address to a member bank and an account.
+2. Ask the **payer's bank** for a hold. Refused → `failed`, nothing posted.
+3. Ask the **payee's bank** to credit. Refused → `reversal_pending` → release → `reversed`.
+4. Confirm the hold as a settled debit; post the clearing entries and the recipient's notification in one DB transaction → `completed`.
+
+`driveTransfer()` in `services/transfers.ts` is one resumable function shared by the worker and the recovery sweeper.
 
 ---
 
 # Data Model (Drizzle / Postgres)
 
-All tables get `id` (uuid, default `gen_random_uuid()`), `created_at`, `updated_at` unless noted. Use Drizzle's `pgEnum` for enums.
+All tables get `id` (uuid), `created_at`, `updated_at` unless noted.
 
-## users
-- `email` text unique not null
-- `password_hash` text not null
-- `full_name` text not null
-- `country_code` char(2) not null — ISO 3166 (KN, JM, BB, TT, VC, …)
-- `kyc_status` enum: `unverified | pending | verified` (default `unverified`; prototype auto-verifies on signup, but the field exists)
+## Switch database (`caribpay`)
 
-## refresh_tokens
-- `user_id` fk → users, `token_hash` text, `expires_at`, `revoked_at` nullable
+**users** — email, password_hash, full_name, country_code, kyc_status.
 
-## wallets
-One wallet per user per currency.
-- `user_id` fk → users
-- `currency` enum: `XCD | JMD | BBD | TTD | USD`
-- `address` text unique not null — human-shareable, format `CW-XXXX-XXXX-XXXX-XXXX`
-- unique index on (`user_id`, `currency`)
+**institutions** — the member banks. `legal_name`, `display_name`, `country_code`, `currency`, `psp_handle` (unique, the `@suffix`), `psp_status` (`active | planned`), `supports_account_linking`, `is_simulated`, `reserved_aliases[]`, `sort_order`. Seeded from `packages/shared/institutions-data.ts`, the single list both services read.
 
-## system_accounts
-Internal counterparty accounts so every ledger transaction balances.
-- `type` enum: `fx_liquidity | settlement_clearing | fee_revenue`
-- `currency` enum (same as wallets)
-- unique on (`type`, `currency`). Seeded at migration time.
+**linked_accounts** — `user_id`, `institution_id`, `account_ref`, `account_number_masked`, `currency`, `holder_name_verified`, `is_default`, `status`. **No balance column, ever.**
 
-## transactions
-One row per logical money movement.
-- `type` enum: `p2p_transfer | deposit | withdrawal | fx_conversion`
-- `status` enum: `initiated | pending_settlement | settled | failed`
-- `idempotency_key` text unique not null
-- `sender_user_id` / `recipient_user_id` nullable fks
-- `source_currency`, `dest_currency`, `source_amount_minor` bigint, `dest_amount_minor` bigint
-- `fx_rate_used` numeric(18,8) nullable
-- `failure_reason` text nullable
-- `settled_at` timestamptz nullable
+**directory_keys** — `user_id`, `type` (`vpa | phone | email`), `value_raw`, `value_normalized` (globally unique), `skeleton` (globally unique, VPA only), `institution_id`, `linked_account_id` (nullable → default account), `is_primary`, `verified_at`, `released_at`.
 
-## ledger_entries  (append-only — enforce with a Postgres trigger that raises on UPDATE/DELETE)
-- `transaction_id` fk → transactions
-- `account_type` enum: `user_wallet | system`
-- `wallet_id` nullable fk → wallets
-- `system_account_id` nullable fk → system_accounts
-- `direction` enum: `debit | credit`
-- `amount_minor` bigint not null, > 0
-- `currency` enum
-- **Invariant (enforced in the ledger service, asserted in tests):** per transaction per currency, sum(debits) = sum(credits).
+**system_accounts** — clearing accounts: `bank_position` (one per member bank per currency, with `debit_cap_minor`), plus `fx_liquidity`, `settlement_clearing`, `fee_revenue` per currency.
 
-## wallet_balances (cache, rebuildable)
-- `wallet_id` pk fk, `balance_minor` bigint, `as_of_entry_created_at`
-- Updated in the same DB transaction as entry insertion. A `bun run reconcile` script must recompute all balances from `ledger_entries` and diff against this table.
+**transactions** — `type`, `status` (the eight lifecycle states), `idempotency_key`, sender/recipient user ids, `payer_account_id`, `payee_account_id`, amounts, `fx_rate_used`, `recipient_key_used` + `recipient_name_snapshot` (so a receipt reads correctly after a handle changes), `hold_ref`, `debit_ref`, `credit_ref`, `deadline_at`.
 
-## fx_rates
-- `base_currency`, `quote_currency`, `rate` numeric(18,8), `valid_from` timestamptz
-- Seeded with realistic static rates (XCD is USD-pegged at 2.70; derive crosses). Service reads the latest row per pair. No external API calls.
+**ledger_entries** *(append-only)* — `transaction_id`, `system_account_id` (NOT NULL), `direction`, `amount_minor`, `currency`. Every entry is a system-account entry; there is no customer side.
+**Invariant:** per transaction per currency, sum(debits) = sum(credits).
 
-## idempotency_records
-- `key` text pk, `user_id`, `request_hash` text, `response_status` int, `response_body` jsonb, `expires_at`
+**settlement_cycles** / **settlement_cycle_entries**, **notifications**, **contacts**, **fx_rates**, **idempotency_records**, **refresh_tokens**.
+
+## Bank database (`caribpay_bank`)
+
+**accounts** (`account_ref`, `institution_handle`, `holder_name`, `currency`, `balance_minor`, `status`), **holds** (with `expires_at` so nothing strands), **debits**, **credits**, **bank_idempotency_records**.
+
+**This is where customer money lives.** The switch has no credentials for it.
 
 ---
 
 # API Surface (v1, prefix `/api/v1`)
 
-All bodies validated with shared Zod schemas. Auth = Bearer access token unless marked public.
+| Method & path | Purpose |
+|---|---|
+| POST `/auth/register` (public) | Creates user + mints a neutral default address. No wallet. |
+| POST `/auth/login` · `/auth/refresh` · `/auth/logout` | |
+| GET `/me` | |
+| GET `/institutions` | Member banks, for the linking picker and VPA suffixes |
+| GET `/accounts` · POST `/accounts` | Linked bank accounts |
+| GET `/accounts/:id/balance` | **Live from the bank, cached nowhere** |
+| GET `/directory/resolve?key=` | Masked name + currency + institution. Auth, rate limited, logged. Never returns an account reference or user id. |
+| GET `/directory/available?vpa=` | Availability, with the reason |
+| GET/POST `/directory/keys` · POST `/:id/verify` · DELETE `/:id` | |
+| GET `/fx/quote?from&to&amountMinor` | 60-second lock |
+| POST `/transfers` | `{ toKey, sourceAccountId, sourceCurrency, destCurrency, sourceAmountMinor, quoteId?, note? }`. Idempotency-Key required. |
+| GET `/transfers/:id` | Mobile polls until terminal |
+| GET `/transactions` · `/contacts` · `/qr/receive` · `/qr/resolve` | |
+| GET `/notifications` · `/unread-count` · POST `/:id/read` · `/read-all` | |
+| GET `/settlement/positions` | What each bank owes; the switch's FX book |
+| GET `/health` (public) | |
 
-| Method & path | Purpose | Notes |
-|---|---|---|
-| POST `/auth/register` (public) | email, password, fullName, countryCode | Creates user + one wallet in home currency + auto-verifies KYC (prototype). Returns tokens. |
-| POST `/auth/login` (public) | | Returns access + refresh. |
-| POST `/auth/refresh` (public) | | Rotates refresh token. |
-| POST `/auth/logout` | | Revokes refresh token. |
-| GET `/me` | Profile + kyc status | |
-| GET `/wallets` | All wallets with cached balances + total in home currency (via fx) | Powers the home screen balance card. |
-| POST `/wallets` | Create wallet in another supported currency | |
-| GET `/wallets/:id/transactions` | Paginated (cursor) transaction history for that wallet | |
-| GET `/fx/quote?from=XCD&to=JMD&amountMinor=150000` | Returns rate, destAmountMinor, quoteExpiresAt (60 s) | Powers the live converter on the Send screen. |
-| POST `/transfers` | Body: recipientAddress, sourceCurrency, destCurrency, sourceAmountMinor, note?. Header: Idempotency-Key. | Validates balance, writes hold entries, enqueues settlement, returns transaction in `pending_settlement`. |
-| GET `/transfers/:id` | Status + full detail | Mobile polls this (2 s interval) until terminal state. |
-| GET `/transactions` | Unified paginated feed across wallets | Powers "Regional Transfers" list. |
-| GET `/qr/receive` | Returns wallet address + a signed QR payload string `caribpay://pay?...` | |
-| POST `/contacts` / GET `/contacts` | Quick contacts (userId or wallet address + display name) | |
-| GET `/health` (public) | db + redis check | For CI and pm2. |
+**Clearing postings for a cross-currency transfer (XCD → JMD):**
+1. `DEBIT payer_bank_position(XCD)` / `CREDIT fx_liquidity(XCD)`
+2. `DEBIT fx_liquidity(JMD)` / `CREDIT payee_bank_position(JMD)`
 
-**Ledger postings for a cross-currency P2P (XCD → JMD), the flow judges will see:**
-1. Debit sender XCD wallet `source_amount_minor`; credit `fx_liquidity(XCD)` — same amount.
-2. Debit `fx_liquidity(JMD)` `dest_amount_minor`; credit recipient JMD wallet — same amount.
-Both currency legs balance independently. Same-currency transfers post a single leg. Fees are out of scope (transfer fee = free, matching the UI).
+Both currency legs balance independently. Same-currency posts a single leg directly between the two banks. Position sign convention: `credits − debits`; negative means that bank owes the network.
 
 ---
 
-# Settlement Layer
+# Bank Connector
 
 ```ts
-// apps/api/src/settlement/provider.ts
-export interface SettlementProvider {
-  /** Submit a transfer for inter-institution settlement. Resolves when accepted, not settled. */
-  submit(tx: SettlementRequest): Promise<{ providerRef: string }>;
-  /** Called by the worker to check/complete settlement. */
-  poll(providerRef: string): Promise<"pending" | "settled" | "failed">;
+// apps/api/src/banks/connector.ts
+export interface BankConnector {
+  verifyAccount(accountRef): Promise<VerifyAccountResponse>;
+  getBalance(accountRef): Promise<BankBalanceResponse>;
+  placeHold(input, idempotencyKey): Promise<HoldResponse>;
+  confirmDebit(holdRef, idempotencyKey): Promise<ConfirmDebitResponse>;
+  releaseHold(holdRef, idempotencyKey): Promise<{ released: true }>;
+  postCredit(input, idempotencyKey): Promise<CreditResponse>;
+  listOutstandingHolds(): Promise<OutstandingHold[]>;
 }
 ```
 
-`MockCapssProvider` implements this: `submit` returns a fake reference instantly; `poll` returns `settled` after a randomized 2–5 s delay (configurable via env `MOCK_SETTLEMENT_DELAY_MS`), with a 2% random failure rate toggleable via `MOCK_SETTLEMENT_FAILURES=true` (default false for demos). The BullMQ worker `settlement-worker` consumes jobs from the `settlement` queue, polls the provider, and on `settled` posts the credit leg + flips transaction status; on `failed` reverses the hold. All status flips happen inside a DB transaction.
-
-This interface is the architectural answer to "how does this connect to CAPSS?" — the real provider is a drop-in implementation later.
+The interface points **outward at banks** — that inversion is the architecture. `HttpBankConnector` talks to `apps/mock-bank`; a real bank is a drop-in implementation. It classifies every failure into `BankRefusedError` or `BankUnknownError` so callers cannot get that distinction wrong.
 
 ---
 
-# Explicitly Out of Scope (do not build, do not stub UI for)
+# Verification
 
-Real CAPSS/bank integration, real KYC, NFC, push notifications, WebSockets, fraud/AI monitoring, merchant payments, fees, admin dashboard, biometrics, dark mode. If any of these seem "quick to add," don't — flag it and continue.
+```bash
+bun test                # 138 tests, incl. the switch↔bank integration suite
+bun run reconcile       # per-currency zero, caps, stalled transfers, stranded holds
+bun run settle          # net member-bank positions to zero
+bun run typecheck       # four workspaces
+```
+
+---
+
+# Local environment note
+
+**See [RUNNING.md](RUNNING.md) for the full machine-specific runbook.** The essentials:
+
+Docker on this machine runs inside WSL2 Ubuntu (no Docker Desktop). The redis container maps to host port 6380 here (native WSL redis owns 6379).
+
+**Run `bun test` through WSL on this machine** — Bun for Windows (≤1.3.14) hangs or segfaults in bun:test under postgres connection churn. Everything else runs fine on Windows.
+
+**Before debugging any DB failure, check that WSL is alive:** `(Get-Process wsl).Count`. With no persistent `wsl.exe`, WSL tears down the distro ~10 s after the last command exits and takes dockerd with it.
+
+---
+
+# Explicitly Out of Scope
+
+Real bank integration, real KYC, real OTP delivery, NFC, push notifications, WebSockets, fraud/AI monitoring, merchant payments, cards, fees, admin dashboard, biometrics, dark mode, collect/pull requests, autopay mandates. If any of these seem "quick to add," don't — flag it and continue.
