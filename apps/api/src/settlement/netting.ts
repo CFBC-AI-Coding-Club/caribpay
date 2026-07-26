@@ -1,8 +1,7 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { formatAmount, type Currency } from "@caribpay/shared";
 import type { DbHandle } from "../db/client";
 import {
-  institutions,
   settlementCycleEntries,
   settlementCycles,
   systemAccounts,

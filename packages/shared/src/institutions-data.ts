@@ -3,9 +3,12 @@
  *
  * ⚠️  EVERY INSTITUTION HERE IS SIMULATED. These are real, named financial
  * institutions and we have **no relationship with any of them**. Nothing in this
- * repository connects to a real bank. Every screen that displays one of these
- * names must render `SimulatedNotice` alongside it, so that a photograph of the
- * screen carries the disclaimer with it.
+ * repository connects to a real bank.
+ *
+ * The app deliberately carries no in-app disclaimer — it was repeated on five
+ * screens and read as a defect rather than a disclosure. The obligation moved to
+ * the people presenting: say it out loud, and see the note at the top of
+ * `DEMO.md`.
  *
  * Only `caribpay` is an active PSP — the only suffix a user can register a VPA
  * against. Every bank is `planned`, which is what makes the multi-PSP

@@ -6,9 +6,11 @@ to Jamaica, watch it arrive on a second device, then prove the books.
 > **Every bank named in this app is simulated.** CaribPay has no relationship with
 > St. Kitts-Nevis-Anguilla National Bank, NCB Jamaica, Republic Bank, Scotiabank,
 > CIBC, or any other institution in the list. Nothing here connects to a real bank.
-> Every screen that shows an institution name carries a "Simulated — no live bank
-> connection" notice, deliberately, so a photograph of a screen carries the
-> disclaimer with it.
+>
+> The app itself carries no disclaimer, so **say this out loud at the top of the
+> demo** — it is the first thing to establish, and a judge should never have to
+> ask. It is also the honest lead-in to the architecture: we are not connected to
+> these banks, and we are not holding anyone's money either.
 
 ---
 

@@ -2,6 +2,7 @@ import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { color, font } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
+import { useArrivalWatcher, useUnreadCount } from "@/api/hooks";
 
 /** The board's bar height, measured above the home-indicator area. */
 const TAB_BAR_HEIGHT = 88;
@@ -19,6 +20,11 @@ function tabIcon(name: IconName) {
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  // Polled here rather than on Home so an arrival is visible from any tab —
+  // the whole point is that the recipient does not have to be looking.
+  const unread = useUnreadCount();
+  useArrivalWatcher(unread.data);
+  const unreadCount = unread.data ?? 0;
 
   return (
     <Tabs
@@ -42,7 +48,17 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="home" options={{ title: "Home", tabBarIcon: tabIcon("home") }} />
-      <Tabs.Screen name="activity" options={{ title: "Activity", tabBarIcon: tabIcon("activity") }} />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          title: "Activity",
+          tabBarIcon: tabIcon("activity"),
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: color.error, ...font(11, 700) },
+          tabBarAccessibilityLabel:
+            unreadCount > 0 ? `Activity, ${unreadCount} new` : "Activity",
+        }}
+      />
       <Tabs.Screen name="contacts" options={{ title: "Contacts", tabBarIcon: tabIcon("people") }} />
       <Tabs.Screen name="menu" options={{ title: "Menu", tabBarIcon: tabIcon("grid") }} />
     </Tabs>

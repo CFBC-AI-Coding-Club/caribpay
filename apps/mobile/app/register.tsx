@@ -71,7 +71,7 @@ export default function RegisterScreen() {
             Create your account
           </Txt>
           <Txt size={15} weight={500} color={color.onDarkMuted} style={{ marginTop: 6 }}>
-            Join the region-wide wallet.
+            One address. Every island.
           </Txt>
         </View>
       }
@@ -136,11 +136,16 @@ export default function RegisterScreen() {
             onPress={() => setPickerOpen(true)}
           />
 
+          {/*
+            Says what actually happens, and what does not: signup mints an
+            address, but nothing can reach it until a bank account is connected.
+            Promising a wallet here would be promising something we deleted.
+          */}
           <Notice
             tone="primary"
             icon="info"
-            title={`Your ${CURRENCY_SYMBOLS[homeCurrency]} home wallet`}
-            body={`We'll open your ${CURRENCY_SYMBOLS[homeCurrency]} (${homeCurrency}) wallet automatically when you join.`}
+            title="You'll get a CaribPay address"
+            body="Connect your bank account afterwards and the address starts working — CaribPay moves the money, your bank keeps it."
           />
 
           <Button

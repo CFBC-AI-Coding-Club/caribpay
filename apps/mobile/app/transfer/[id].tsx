@@ -313,7 +313,7 @@ export default function TransferStatusScreen() {
           </Txt>
           {failed ? (
             <Txt size={15} weight={500} color={color.inkMuted} align="center" style={{ marginTop: 6 }}>
-              No money left your wallet.
+              No money left your account.
             </Txt>
           ) : settled ? (
             <Txt size={15} weight={500} color={color.inkMuted} align="center" style={{ marginTop: 6 }}>

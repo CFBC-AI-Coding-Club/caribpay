@@ -33,7 +33,7 @@ export default function LoginScreen() {
             Welcome back
           </Txt>
           <Txt size={15} weight={500} color={color.onDarkMuted} style={{ marginTop: 6 }}>
-            Log in to your CaribPay wallet.
+            Log in to your CaribPay account.
           </Txt>
         </View>
       }

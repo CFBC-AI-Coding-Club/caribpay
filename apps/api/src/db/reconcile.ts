@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, inArray, lt, sql } from "drizzle-orm";
 import { formatAmount, type Currency } from "@caribpay/shared";
 import type { DbHandle } from "./client";
 import { transactions } from "./schema";

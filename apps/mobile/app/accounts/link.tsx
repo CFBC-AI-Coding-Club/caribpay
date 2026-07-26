@@ -12,7 +12,6 @@ import {
   Screen,
   ScreenHeader,
   SelectField,
-  SimulatedNotice,
   TextField,
   Txt,
 } from "@/components/ui";
@@ -78,8 +77,6 @@ export default function LinkAccountScreen() {
           contentContainerStyle={{ padding: space.gutter, gap: space.lg }}
           keyboardShouldPersistTaps="handled"
         >
-          <SimulatedNotice />
-
           {link.isError && (
             <Notice
               tone="error"

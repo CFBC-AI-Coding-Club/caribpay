@@ -103,7 +103,7 @@ export default function SplashScreen() {
       </View>
       <View style={{ alignItems: "center", gap: space.lg, paddingBottom: 30 }}>
         <PulsingDots />
-        <Txt size={13} weight={500} color="rgba(255,255,255,0.88)">
+        <Txt size={13} weight={500} color={color.onDarkMuted}>
           Securing your session…
         </Txt>
       </View>

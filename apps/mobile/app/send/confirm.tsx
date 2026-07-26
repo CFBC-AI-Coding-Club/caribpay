@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { COUNTRY_NAMES, CURRENCY_SYMBOLS } from "@caribpay/shared";
 import { color, space } from "@/theme";
@@ -12,7 +12,6 @@ import {
   RowGroup,
   Screen,
   ScreenHeader,
-  SimulatedNotice,
   Txt,
 } from "@/components/ui";
 import { useResolveKey } from "@/api/hooks";
@@ -86,7 +85,10 @@ export default function SendConfirmScreen() {
     <Screen edges={{ bottom: false }}>
       <ScreenHeader title="Confirm recipient" />
 
-      <View style={{ flex: 1, paddingHorizontal: space.gutter }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: space.gutter }}
+      >
         <View style={{ alignItems: "center", gap: 10, marginTop: space.xl }}>
           <Avatar
             name={payee.maskedName}
@@ -132,11 +134,7 @@ export default function SendConfirmScreen() {
             </Txt>
           </Row>
         </RowGroup>
-
-        <View style={{ marginTop: space.md }}>
-          <SimulatedNotice />
-        </View>
-      </View>
+      </ScrollView>
 
       <View style={{ paddingHorizontal: space.gutter, paddingTop: space.md, gap: 10 }}>
         <Button label="Yes, that's them" icon="checkWide" onPress={proceed} />

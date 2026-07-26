@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { COUNTRY_NAMES, CURRENCY_SYMBOLS } from "@caribpay/shared";
 import { color, radius, shadow, space } from "@/theme";
 import { Icon } from "@/components/Icon";
@@ -14,7 +14,6 @@ import {
   Notice,
   Screen,
   ScreenHeader,
-  Segmented,
   TextField,
   Toggle,
   Txt,
@@ -22,16 +21,13 @@ import {
 import { useResolveKey, useCreateContact } from "@/api/hooks";
 import { ApiRequestError } from "@/api/client";
 
-const MODES = [
-  { value: "address" as const, label: "Wallet address" },
-  { value: "scan" as const, label: "Scan QR" },
-];
-
 export default function AddContactScreen() {
   const router = useRouter();
   const createContact = useCreateContact();
 
-  const [address, setAddress] = useState("");
+  // A scan hands the address back here rather than hijacking the flow.
+  const { key: scannedKey } = useLocalSearchParams<{ key?: string }>();
+  const [address, setAddress] = useState(scannedKey ?? "");
   const [displayName, setDisplayName] = useState("");
   const [nameEdited, setNameEdited] = useState(false);
   const [pinned, setPinned] = useState(true);
@@ -65,12 +61,11 @@ export default function AddContactScreen() {
           contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.md, gap: 14 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Segmented
-            options={MODES}
-            value="address"
-            onChange={(next) => {
-              if (next === "scan") router.push("/scan");
-            }}
+          <Button
+            label="Scan their QR code"
+            icon="scan"
+            variant="secondary"
+            onPress={() => router.push({ pathname: "/scan", params: { returnTo: "contact" } })}
           />
 
           {createContact.isError && (
@@ -86,11 +81,11 @@ export default function AddContactScreen() {
           )}
 
           <TextField
-            label="Wallet address"
+            label="Their CaribPay address"
             value={address}
             onChangeText={setAddress}
-            placeholder="CW-XXXX-XXXX-XXXX-XXXX"
-            autoCapitalize="characters"
+            placeholder="name@caribpay"
+            autoCapitalize="none"
             autoCorrect={false}
           />
 
@@ -106,8 +101,8 @@ export default function AddContactScreen() {
               }
               body={
                 lookup.error instanceof ApiRequestError && lookup.error.code === "OWN_ADDRESS"
-                  ? "Pick someone else's wallet address to save as a contact."
-                  : "Check the address — every CaribPay address looks like CW-XXXX-XXXX-XXXX-XXXX."
+                  ? "Enter their CaribPay address, phone number, or email."
+                  : "Check it and try again — a CaribPay address looks like name@caribpay."
               }
             />
           )}

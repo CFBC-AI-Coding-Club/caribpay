@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   EmptyState,
+  ErrorState,
   HomeIndicator,
   ListRow,
   Loading,
@@ -89,7 +90,13 @@ export default function SendRecipientScreen() {
       />
 
       {mode === "contact" ? (
-        <ContactPicker contacts={contacts.data} pending={contacts.isPending} onPick={confirm} />
+        <ContactPicker
+          contacts={contacts.data}
+          pending={contacts.isPending}
+          failed={contacts.isError}
+          onRetry={() => void contacts.refetch()}
+          onPick={confirm}
+        />
       ) : (
         <AddressEntry value={typed} onChange={setTyped} onSubmit={() => confirm(typed)} />
       )}
@@ -110,14 +117,28 @@ export default function SendRecipientScreen() {
 function ContactPicker({
   contacts,
   pending,
+  failed,
+  onRetry,
   onPick,
 }: {
   contacts: Contact[] | undefined;
   pending: boolean;
+  failed: boolean;
+  onRetry: () => void;
   onPick: (key: string) => void;
 }) {
   const router = useRouter();
   if (pending) return <Loading label="Loading contacts…" />;
+  // "No saved contacts" would be a lie when the list simply did not load.
+  if (failed) {
+    return (
+      <ErrorState
+        title="We can't load your contacts"
+        body="You can still switch to Address and enter one directly."
+        onRetry={onRetry}
+      />
+    );
+  }
   if (contacts === undefined || contacts.length === 0) {
     return (
       <EmptyState

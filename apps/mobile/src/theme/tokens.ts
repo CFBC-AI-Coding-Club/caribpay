@@ -82,12 +82,27 @@ export const color = {
   homeIndicator: "rgba(26,19,64,0.22)",
   homeIndicatorOnDark: "rgba(255,255,255,0.40)",
 
-  // On-dark text (over the deep gradient)
+  // On-dark text and surfaces (over the deep gradient)
   onDark: "#FFFFFF",
   onDarkMuted: "rgba(255,255,255,0.92)",
   onDarkFaint: "rgba(255,255,255,0.75)",
   onDarkFill: "rgba(255,255,255,0.14)",
+  onDarkFillStrong: "rgba(255,255,255,0.32)",
   onDarkBorder: "rgba(255,255,255,0.22)",
+  /** The board's 20% black scrim behind a chip on the nocturne card. */
+  onDarkScrim: "rgba(0,0,0,0.20)",
+  /** Ghosted display type used as background texture, never as content. */
+  onDarkGhost: "rgba(255,255,255,0.13)",
+
+  // Scan screen — a dark scrim over a live camera feed.
+  scanScrim: "rgba(18,12,40,0.45)",
+  scanScrimFailed: "rgba(37,21,48,0.92)",
+  scanPanel: "rgba(255,255,255,0.05)",
+  scanPanelBorder: "rgba(255,255,255,0.10)",
+  errorScrim: "rgba(198,58,58,0.16)",
+  errorScrimBorder: "rgba(198,58,58,0.34)",
+  errorScrimSoft: "rgba(198,58,58,0.12)",
+  errorScrimSoftBorder: "rgba(198,58,58,0.30)",
 } as const;
 
 /** Deep hero gradient — the app's signature surface (135°, top-left → bottom-right). */

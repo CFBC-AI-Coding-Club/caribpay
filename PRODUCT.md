@@ -142,8 +142,10 @@ diverge, record the divergence rather than silently choosing one.
   Claude Design project, which the mobile app implements. It is the authority for the visual
   system; deviations from it are deliberate and documented at the point of use in code.
 - **Every institution named in the product is simulated.** We have no relationship with any of
-  them. Any screen displaying an institution name renders `SimulatedNotice` alongside it, so a
-  photograph of the screen carries the disclaimer with it.
+  them. The disclosure lives in `DEMO.md`, the institutions seed file, and what the team says
+  when presenting — deliberately not as in-app chrome, which was repeated on five screens and
+  read as a defect rather than a disclosure. **This is a presentation obligation now, not a
+  rendered one:** say it out loud when the app is on screen.
 - **Voice:** plain, calm, and concrete about money. State what will happen, what it costs, and
   what has already happened. Never imply money moved before it did, never imply money was lost
   when a hold was reversed, and never claim to know an outcome that is unknown.

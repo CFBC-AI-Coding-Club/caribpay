@@ -196,8 +196,9 @@ UI says "as reported by your bank just now" and means it.
 The eight saga states map onto three the payer needs: **Held at your bank → Clearing → Delivered**.
 "Held" is the honest word — reserved, not sent, released in full if the credit fails.
 
-Every screen naming an institution renders `SimulatedNotice`, a component in the kit rather than a
-string someone remembers.
+Institution names appear without in-app disclaimers: the notice was repeated on five screens and
+read as a defect rather than a disclosure. The simulation is disclosed in `DEMO.md`, in the
+institutions seed header, and verbally when presenting.
 
 ## 10. Known soft spots
 

@@ -1,4 +1,4 @@
-import { RefreshControl, ScrollView, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { CURRENCY_SYMBOLS, formatAmount, splitAmount, type LinkedAccount } from "@caribpay/shared";
 import { color, radius, shadow, space } from "@/theme";
@@ -14,7 +14,6 @@ import {
   ListRow,
   Screen,
   SectionHeader,
-  SimulatedNotice,
   Skeleton,
   Txt,
 } from "@/components/ui";
@@ -22,7 +21,6 @@ import { TransactionRow } from "@/components/TransactionRow";
 import {
   useAccountBalance,
   useAccounts,
-  useArrivalWatcher,
   useMe,
   useTransactions,
   useUnreadCount,
@@ -35,23 +33,55 @@ const QUICK_ACTIONS: Array<{ label: string; icon: IconName; href: string }> = [
   { label: "Accounts", icon: "card", href: "/accounts" },
 ];
 
+/**
+ * The board's quick-action tiles: a 56pt rounded square carrying `shadow.tile`,
+ * which is a half-step above a card and distinct from the round `shadow.control`
+ * an icon button uses. They are the only tiles in the system, so the treatment
+ * is theirs alone.
+ */
 function QuickActions() {
   const router = useRouter();
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space.gutter, paddingTop: space.xl, paddingBottom: space.sm }}>
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: space.gutter,
+        paddingTop: space.xl,
+        paddingBottom: space.sm,
+      }}
+    >
       {QUICK_ACTIONS.map((action) => (
-        <View key={action.label} style={{ alignItems: "center", gap: space.sm }}>
-          <IconButton
-            icon={action.icon}
-            accessibilityLabel={action.label}
-            size={56}
-            elevated
-            onPress={() => router.push(action.href as never)}
-          />
-          <Txt size={12} weight={600} color={color.inkOnTint}>
-            {action.label}
-          </Txt>
-        </View>
+        <Pressable
+          key={action.label}
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          onPress={() => router.push(action.href as never)}
+          style={{ alignItems: "center", gap: space.sm }}
+        >
+          {({ pressed }) => (
+            <>
+              <View
+                style={[
+                  {
+                    width: 56,
+                    height: 56,
+                    borderRadius: radius.card,
+                    backgroundColor: pressed ? color.primarySoft : color.surface,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  },
+                  shadow.tile,
+                ]}
+              >
+                <Icon name={action.icon} size={23} color={color.link} strokeWidth={2} />
+              </View>
+              <Txt size={12} weight={600} color={color.inkOnTint}>
+                {action.label}
+              </Txt>
+            </>
+          )}
+        </Pressable>
       ))}
     </View>
   );
@@ -78,7 +108,7 @@ function BalanceCard({ account }: { account: LinkedAccount }) {
             flexDirection: "row",
             alignItems: "center",
             gap: 6,
-            backgroundColor: "rgba(0,0,0,0.20)",
+            backgroundColor: color.onDarkScrim,
             paddingHorizontal: 8,
             paddingVertical: 5,
             borderRadius: radius.pill,
@@ -90,7 +120,6 @@ function BalanceCard({ account }: { account: LinkedAccount }) {
           </Txt>
         </View>
       </View>
-
       {balance.isPending ? (
         <View style={{ marginTop: space.md }}>
           <Skeleton height={40} width="62%" radius={radius.sm} />
@@ -167,7 +196,6 @@ export default function HomeScreen() {
   const accounts = useAccounts();
   const feed = useTransactions();
   const unread = useUnreadCount();
-  useArrivalWatcher(unread.data);
 
   const user = me.data?.user;
   const list = accounts.data?.accounts ?? [];
@@ -207,7 +235,6 @@ export default function HomeScreen() {
           onPress={() => router.push("/(tabs)/activity")}
         />
       </View>
-
       {accounts.isError ? (
         <ErrorState
           title="We can't reach your accounts"
@@ -240,11 +267,6 @@ export default function HomeScreen() {
         >
           <BalanceCard account={primary} />
           <QuickActions />
-
-          <View style={{ paddingHorizontal: space.gutter, paddingTop: 6 }}>
-            <SimulatedNotice compact />
-          </View>
-
           {others.length > 0 && (
             <>
               <SectionHeader title="Other accounts" />

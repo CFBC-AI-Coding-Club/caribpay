@@ -122,11 +122,13 @@ export default function SendAmountScreen() {
     [linked],
   );
 
-  if (recipient === null) {
-    // Landed here without a recipient — send them back rather than guessing.
-    router.replace("/send");
-    return null;
-  }
+  // Landed here without a recipient (deep link, or a cleared draft). Redirect
+  // from an effect, never during render — navigating in the render pass warns
+  // and can loop.
+  useEffect(() => {
+    if (recipient === null) router.replace("/send");
+  }, [recipient, router]);
+  if (recipient === null) return null;
 
   function proceed() {
     if (!canReview) return;

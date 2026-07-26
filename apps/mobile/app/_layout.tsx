@@ -45,6 +45,8 @@ function RootNavigator({ ready }: { ready: boolean }) {
       <Stack.Screen name="register" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="send/index" />
+      <Stack.Screen name="send/confirm" />
+      <Stack.Screen name="send/amount" />
       <Stack.Screen name="send/review" />
       {/*
         The back gesture stays enabled here. Settlement continues server-side
@@ -55,8 +57,11 @@ function RootNavigator({ ready }: { ready: boolean }) {
       */}
       <Stack.Screen name="transfer/[id]" />
       <Stack.Screen name="transaction/[id]" />
-      <Stack.Screen name="wallet/[id]" />
-      <Stack.Screen name="wallet/add" />
+      <Stack.Screen name="accounts/index" />
+      <Stack.Screen name="accounts/link" />
+      <Stack.Screen name="directory/keys" />
+      <Stack.Screen name="directory/claim" />
+      <Stack.Screen name="settlement" />
       <Stack.Screen name="contact/add" />
       <Stack.Screen name="receive" />
       <Stack.Screen name="scan" options={{ animation: "fade" }} />

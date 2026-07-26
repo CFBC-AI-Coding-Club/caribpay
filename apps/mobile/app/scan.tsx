@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { color, radius, space } from "@/theme";
 import { Icon } from "@/components/Icon";
@@ -77,6 +77,10 @@ function Reticle({ tint }: { tint: string }) {
 
 export default function ScanScreen() {
   const router = useRouter();
+  // Scanning is reachable from Send and from Add contact. Without knowing which,
+  // a scan started while adding a contact would silently drop you into the send
+  // flow with no contact saved.
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const resolve = useResolveQr();
   const setRecipient = useDraftStore((s) => s.setRecipient);
@@ -92,6 +96,10 @@ export default function ScanScreen() {
     setHandled(true);
     resolve.mutate(data, {
       onSuccess: (resolved) => {
+        if (returnTo === "contact") {
+          router.replace({ pathname: "/contact/add", params: { key: resolved.vpa } });
+          return;
+        }
         // The QR is signed, but the directory still gets the last word on who
         // this address currently reaches — so the same confirm step as typing.
         router.replace({ pathname: "/send/confirm", params: { key: resolved.vpa } });
@@ -155,7 +163,7 @@ export default function ScanScreen() {
               icon="torch"
               accessibilityLabel={torch ? "Turn off the torch" : "Turn on the torch"}
               color={color.onDark}
-              background={torch ? "rgba(255,255,255,0.32)" : color.onDarkFill}
+              background={torch ? color.onDarkFillStrong : color.onDarkFill}
               elevated={false}
               strokeWidth={1.9}
               onPress={() => setTorch((t) => !t)}
@@ -183,7 +191,7 @@ export default function ScanScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: failed ? "rgba(37,21,48,0.92)" : "rgba(18,12,40,0.45)",
+            backgroundColor: failed ? color.scanScrimFailed : color.scanScrim,
           }}
         />
 
@@ -196,9 +204,9 @@ export default function ScanScreen() {
               right: 0,
               bottom: 0,
               borderRadius: radius.sheet,
-              backgroundColor: failed ? "rgba(198,58,58,0.12)" : "rgba(255,255,255,0.05)",
+              backgroundColor: failed ? color.errorScrimSoft : color.scanPanel,
               borderWidth: 1,
-              borderColor: failed ? "rgba(198,58,58,0.3)" : "rgba(255,255,255,0.1)",
+              borderColor: failed ? color.errorScrimSoftBorder : color.scanPanelBorder,
             }}
           />
           {failed ? (
@@ -233,9 +241,9 @@ export default function ScanScreen() {
           <View style={{ width: "100%", paddingHorizontal: space.gutter, marginTop: space.xl }}>
             <View
               style={{
-                backgroundColor: "rgba(198,58,58,0.16)",
+                backgroundColor: color.errorScrim,
                 borderWidth: 1,
-                borderColor: "rgba(198,58,58,0.34)",
+                borderColor: color.errorScrimBorder,
                 borderRadius: radius.field,
                 paddingHorizontal: 14,
                 paddingVertical: space.md,

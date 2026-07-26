@@ -11,7 +11,6 @@ import {
   Screen,
   ScreenHeader,
   SectionHeader,
-  SimulatedNotice,
   Txt,
 } from "@/components/ui";
 import { usePositions } from "@/api/hooks";
@@ -33,7 +32,6 @@ export default function SettlementScreen() {
   return (
     <Screen edges={{ bottom: false }}>
       <ScreenHeader title="Settlement" />
-
       {positions.isPending ? (
         <Loading label="Reading positions…" />
       ) : positions.isError ? (
@@ -44,7 +42,6 @@ export default function SettlementScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }}>
           <View style={{ paddingHorizontal: space.gutter, gap: space.md }}>
-            <SimulatedNotice />
             <Notice
               tone="primary"
               icon="info"

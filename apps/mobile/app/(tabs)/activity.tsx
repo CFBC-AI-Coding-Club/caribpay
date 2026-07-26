@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { RefreshControl, SectionList, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import type { Transaction } from "@caribpay/shared";
 import { color, radius, space, TOUCH_TARGET } from "@/theme";
 import {
@@ -15,7 +15,7 @@ import {
   Txt,
 } from "@/components/ui";
 import { TransactionRow } from "@/components/TransactionRow";
-import { useTransactions } from "@/api/hooks";
+import { useMarkAllRead, useTransactions, useUnreadCount } from "@/api/hooks";
 import { isTerminalStatus } from "@/components/ui/Badge";
 import { dayGroupLabel } from "@/lib/datetime";
 
@@ -57,6 +57,18 @@ export default function ActivityScreen() {
   const router = useRouter();
   const feed = useTransactions();
   const [filter, setFilter] = useState<Filter>("all");
+
+  // Opening this tab is seeing the arrival: the transfer that triggered the
+  // badge is in this list. Without this the badge would never clear.
+  const unread = useUnreadCount();
+  const markAllRead = useMarkAllRead();
+  const hasUnread = (unread.data ?? 0) > 0;
+  const clearBadge = markAllRead.mutate;
+  useFocusEffect(
+    useCallback(() => {
+      if (hasUnread) clearBadge();
+    }, [hasUnread, clearBadge]),
+  );
 
   const all = feed.items;
   const visible = useMemo(() => all.filter((tx) => matches(tx, filter)), [all, filter]);

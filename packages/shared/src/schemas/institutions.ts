@@ -5,8 +5,8 @@ import { PSP_STATUSES, SUPPORTED_CURRENCIES } from "../constants";
  * A member institution. One table serves both roles: the suffix of a VPA
  * (`@ncb`) and an entry in the account-linking picker. An institution is both.
  *
- * Every institution in this system is simulated. `isSimulated` is on the wire so
- * the client cannot forget to say so — see `SimulatedNotice`.
+ * Every institution in this system is simulated. `isSimulated` stays on the wire
+ * so a future surface can act on it, even though nothing renders it today.
  */
 export const institutionSchema = z.object({
   id: z.uuid(),

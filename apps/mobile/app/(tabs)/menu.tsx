@@ -132,7 +132,7 @@ export default function MenuScreen() {
                   <Pill tone="onDark" label="KYC verified" icon="check" style={{ marginTop: 6 }} />
                 )}
               </View>
-              <Icon name="chevronRight" size={20} color="rgba(255,255,255,0.8)" strokeWidth={2.2} />
+              <Icon name="chevronRight" size={20} color={color.onDarkFaint} strokeWidth={2.2} />
             </View>
           </GradientCard>
 

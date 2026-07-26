@@ -34,7 +34,7 @@ export default function WelcomeScreen() {
       <View style={{ flex: 1, overflow: "hidden" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <View style={{ position: "absolute", top: 28, left: space.gutter }}>
           {MARQUEE.map((word) => (
-            <Txt key={word} size={58} weight={800} color="rgba(255,255,255,0.13)" leading={1} tracking={-0.01}>
+            <Txt key={word} size={58} weight={800} color={color.onDarkGhost} leading={1} tracking={-0.01}>
               {word}
             </Txt>
           ))}
