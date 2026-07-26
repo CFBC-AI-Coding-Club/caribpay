@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AccessibilityInfo, Animated, Easing, ScrollView, Share, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { formatAmount, formatRate, type Transaction } from "@caribpay/shared";
+import { formatAmount, formatRate, shortReference, type Transaction } from "@caribpay/shared";
 import { color, space } from "@/theme";
 import { Icon } from "@/components/Icon";
 import {
@@ -17,7 +17,7 @@ import {
   type Step,
 } from "@/components/ui";
 import { useTransfer } from "@/api/hooks";
-import { timeWithSeconds } from "@/lib/datetime";
+import { elapsedLabel, timeWithSeconds } from "@/lib/datetime";
 import { useReducedMotion } from "@/lib/useReducedMotion";
 
 /** Concentric circles expanding outward — the "in flight" and "done" flourish. */
@@ -106,14 +106,16 @@ function useSettlementAnnouncement(
   const announced = useRef<string | null>(null);
 
   useEffect(() => {
-    if (status !== "completed" && status !== "failed") return;
+    if (status !== "completed" && status !== "failed" && status !== "reversed") return;
     if (announced.current === status) return;
     announced.current = status;
 
     AccessibilityInfo.announceForAccessibility(
       status === "completed"
         ? `Sent. ${received} delivered to ${recipientName}.`
-        : "Transfer failed. No money left your account.",
+        : status === "reversed"
+          ? "Transfer returned. Your money is back in your account."
+          : "Transfer failed. No money left your account.",
     );
   }, [status, recipientName, received]);
 }
@@ -140,7 +142,7 @@ function statusSteps(tx: Transaction): Step[] {
       state: tx.status === "failed" ? "failed" : held || undone ? "done" : "active",
     },
     {
-      label: "Clearing across the region",
+      label: done ? "Cleared across the region" : "Clearing across the region",
       detail: done ? undefined : undone ? "Reversing" : "Instructing their bank…",
       state: done ? "done" : undone ? "failed" : held ? "active" : "upcoming",
     },
@@ -189,9 +191,17 @@ export default function TransferStatusScreen() {
   const recipientName = tx.counterparty?.displayName ?? "the recipient";
   const firstName = recipientName.split(" ")[0] ?? recipientName;
   const received = formatAmount(tx.destAmountMinor, tx.destCurrency);
+  const sent = formatAmount(tx.sourceAmountMinor, tx.sourceCurrency);
 
   const settled = tx.status === "completed";
-  const failed = tx.status === "failed";
+  // A refusal and a reversal are both "it didn't happen", but only one of them
+  // has money in motion. `reversal_pending` means the hold is still being
+  // released, and telling someone their money is already back when it isn't is
+  // the one lie this screen must never tell.
+  const returning = tx.status === "reversal_pending";
+  const returned = tx.status === "reversed";
+  const failed = tx.status === "failed" || returned;
+  const stopped = failed || returning;
 
   // This screen changes under the user while they watch it. Sighted users get
   // the mark, the headline, and the timeline; without an explicit announcement a
@@ -207,7 +217,7 @@ export default function TransferStatusScreen() {
         ? null
         : formatRate(tx.fxRateUsed, tx.sourceCurrency, tx.destCurrency),
       "Fee: free",
-      `Reference: ${tx.id}`,
+      `Reference: ${shortReference(tx.id)}`,
     ].filter((line): line is string => line !== null);
     // Best-effort: a dismissed share sheet is not an error worth surfacing.
     await Share.share({ message: lines.join("\n") }).catch(() => undefined);
@@ -242,13 +252,43 @@ export default function TransferStatusScreen() {
             marginTop: 10,
           }}
         >
-          {!failed && (
+          {!stopped && (
             <Ripple
               tint={settled ? color.rippleSettled : color.ripplePending}
               count={settled ? 1 : 2}
             />
           )}
-          {failed ? (
+          {returning ? (
+            <View
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                backgroundColor: color.pending,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="receive" size={38} color={color.onDark} strokeWidth={2.2} />
+            </View>
+          ) : returned ? (
+            // Returned money is not a red event. Nothing was lost, and the mark
+            // should not make someone's stomach drop before they read the words.
+            <Pop>
+              <View
+                style={{
+                  width: 84,
+                  height: 84,
+                  borderRadius: 42,
+                  backgroundColor: color.pendingSoft,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon name="receive" size={40} color={color.pending} strokeWidth={2.4} />
+              </View>
+            </Pop>
+          ) : failed ? (
             <View
               style={{
                 width: 88,
@@ -309,9 +349,28 @@ export default function TransferStatusScreen() {
           accessible
         >
           <Txt size={24} weight={800} align="center">
-            {failed ? "Transfer failed" : settled ? "Sent!" : `Sending to ${firstName}…`}
+            {returning
+              ? "Returning your money"
+              : returned
+                ? "Returned in full"
+                : failed
+                  ? "Transfer failed"
+                  : settled
+                    ? "Sent!"
+                    : `Sending to ${firstName}…`}
           </Txt>
-          {failed ? (
+          {returning ? (
+            <Txt size={15} weight={500} color={color.inkMuted} align="center" style={{ marginTop: 6 }}>
+              {firstName}&rsquo;s bank could not take it. Releasing the hold on {sent} now.
+            </Txt>
+          ) : returned ? (
+            <Txt size={15} weight={500} color={color.inkMuted} align="center" style={{ marginTop: 6 }}>
+              <Txt size={15} weight={700}>
+                {sent}
+              </Txt>{" "}
+              is back in your account
+            </Txt>
+          ) : failed ? (
             <Txt size={15} weight={500} color={color.inkMuted} align="center" style={{ marginTop: 6 }}>
               No money left your account.
             </Txt>
@@ -329,25 +388,89 @@ export default function TransferStatusScreen() {
           )}
         </View>
 
-        {failed && (
+        {/*
+          Reassurance sits above the timeline, not below it. Someone reading
+          "Returning your money" wants to know they are whole before they study
+          which step it stopped at.
+        */}
+        {stopped && (
           <View style={{ width: "100%", marginTop: space.lg }}>
-            <Notice
-              tone="error"
-              title="Settlement did not complete"
-              body="Your hold was reversed in full. Starting again gives you a fresh quote."
-              reference={tx.failureReason ?? undefined}
-            />
+            {returning ? (
+              <Notice
+                tone="pending"
+                icon="info"
+                title="Nothing is lost"
+                body="The hold never became a payment. Your bank releases it back to your available balance, usually within a minute."
+              />
+            ) : returned ? (
+              <Notice
+                tone="pending"
+                icon="check"
+                title="You are back where you started"
+                body="The hold was released in full and nothing was charged. You can try again whenever you like."
+                reference={tx.failureReason ?? undefined}
+              />
+            ) : (
+              <Notice
+                tone="error"
+                title="Settlement did not complete"
+                body="Your hold was reversed in full. Starting again gives you a fresh quote."
+                reference={tx.failureReason ?? undefined}
+              />
+            )}
           </View>
         )}
 
-        <View style={{ width: "100%", marginTop: failed ? space.lg : 26, paddingHorizontal: 6 }}>
-          <Timeline steps={statusSteps(tx)} markerSize={failed || settled ? 26 : 28} />
+        <View style={{ width: "100%", marginTop: stopped ? space.lg : 26, paddingHorizontal: 6 }}>
+          <Timeline steps={statusSteps(tx)} markerSize={stopped || settled ? 26 : 28} />
         </View>
+
+        {/*
+          The two facts worth keeping after it lands: how long it took, and what
+          it cost. Speed is the whole claim of the product, so it is stated as a
+          measurement rather than a promise.
+        */}
+        {settled && (
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              marginTop: space.lg,
+              paddingHorizontal: 6,
+            }}
+          >
+            <View style={{ flex: 1, gap: 3 }}>
+              <Txt size={11} weight={700} color={color.inkFaint}>
+                TOOK
+              </Txt>
+              <Txt size={15} weight={800} tabular>
+                {elapsedLabel(tx.createdAt, tx.settledAt)}
+              </Txt>
+            </View>
+            <View style={{ width: 1, backgroundColor: color.hairline }} />
+            <View style={{ flex: 1, gap: 3, paddingLeft: space.lg }}>
+              <Txt size={11} weight={700} color={color.inkFaint}>
+                FEE
+              </Txt>
+              <Txt size={15} weight={800} color={color.success}>
+                Free
+              </Txt>
+            </View>
+          </View>
+        )}
 
         <View style={{ flex: 1 }} />
 
         <View style={{ width: "100%", gap: 10, paddingBottom: 6 }}>
-          {failed ? (
+          {returning ? (
+            // No "Try again" while the release is still in flight: the original
+            // hold has not come off the account yet, and starting a second
+            // transfer now could fail on funds that are about to be returned.
+            <Button
+              label="Back to home"
+              onPress={() => router.replace("/(tabs)/home")}
+            />
+          ) : failed ? (
             <>
               <Button label="Try again" onPress={() => router.replace("/send")} />
               <Button

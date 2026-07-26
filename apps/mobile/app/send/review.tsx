@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
-import { formatAmount, formatRate, toMinor, type Currency } from "@caribpay/shared";
+import * as Clipboard from "expo-clipboard";
+import {
+  formatAmount,
+  formatRate,
+  shortReference,
+  toMinor,
+  type Currency,
+} from "@caribpay/shared";
 import { color, radius, shadow, space } from "@/theme";
 import { Icon } from "@/components/Icon";
 import {
@@ -17,40 +24,363 @@ import {
   Txt,
 } from "@/components/ui";
 import { useCreateTransfer, useFxQuote } from "@/api/hooks";
-import { useDraftStore } from "@/stores/draft";
+import { useDraftStore, type DraftRecipient } from "@/stores/draft";
 import { ApiRequestError, ApiUnreachableError } from "@/api/client";
-import { countdownLabel, secondsUntil } from "@/lib/datetime";
+import { countdownLabel, secondsUntil, timeLabel } from "@/lib/datetime";
 
 /**
- * Two different truths, and blurring them is the worst thing this screen can do.
- * A request the server rejected never posted, so saying so is honest. A request
+ * Two different truths, and blurring them is the worst thing this flow can do.
+ * A request the server refused never posted, so saying so is honest. A request
  * we never heard back from may well have posted — the transfer could be settling
  * right now — so the only honest thing is to say we do not know and point at the
- * place that does. Retrying is safe either way: the draft's idempotency key makes
- * a second attempt replay the first rather than send twice.
+ * place that does. Each gets a whole screen, because each has different actions
+ * and leaving "Confirm & send" underneath either one invites the wrong move.
  */
-function SendError({ error }: { error: unknown }) {
-  if (error instanceof ApiRequestError && error.status < 500) {
-    return (
-      <Notice
-        tone="error"
-        title="Could not send this transfer"
-        body={error.message}
-        reference={error.code}
-      />
-    );
-  }
+
+/**
+ * Rejected: the switch answered, and the answer was no.
+ *
+ * There is deliberately **no "Try again"**. The request was understood and
+ * refused; sending the identical thing again gets the identical answer, and a
+ * retry button here would only teach people to hammer it. The reason is stated
+ * plainly, the balance is confirmed untouched, and both offered actions lead
+ * somewhere real.
+ */
+function Rejected({
+  error,
+  recipient,
+  sourceAmountMinor,
+  sourceCurrency,
+  attemptedAt,
+  onChangeRecipient,
+}: {
+  error: ApiRequestError;
+  recipient: DraftRecipient;
+  sourceAmountMinor: number;
+  sourceCurrency: Currency;
+  attemptedAt: number;
+  onChangeRecipient: () => void;
+}) {
+  const router = useRouter();
+
+  return (
+    <Screen edges={{ bottom: false }}>
+      <ScreenHeader title="Not sent" />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.sm }}
+      >
+        <View style={{ alignItems: "center", gap: 10, marginTop: space.lg }}>
+          <View
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 30,
+              backgroundColor: color.errorSoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="close" size={26} color={color.error} strokeWidth={2.4} />
+          </View>
+          <Txt size={22} weight={800} align="center" tracking={-0.02}>
+            This transfer was not sent
+          </Txt>
+          <Txt size={14} weight={500} color={color.inkMuted} align="center" leading={1.5}>
+            Nothing left your account. There is nothing to cancel.
+          </Txt>
+        </View>
+
+        <RowGroup style={{ marginTop: space.xl }}>
+          <Row alignTop>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              Reason given
+            </Txt>
+            <Txt
+              size={13}
+              weight={700}
+              align="right"
+              leading={1.4}
+              style={{ flex: 1, marginLeft: space.lg }}
+            >
+              {error.message}
+            </Txt>
+          </Row>
+          <Row>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              Your balance
+            </Txt>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Txt size={13} weight={700} color={color.success}>
+                Unchanged
+              </Txt>
+              <Icon name="check" size={14} color={color.success} strokeWidth={2.4} />
+            </View>
+          </Row>
+          <Row>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              You were sending
+            </Txt>
+            <Txt size={13} weight={700} tabular>
+              {formatAmount(sourceAmountMinor, sourceCurrency)}
+            </Txt>
+          </Row>
+          <Row>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              To
+            </Txt>
+            <Txt size={13} weight={700} numberOfLines={1} style={{ flex: 1 }} align="right">
+              {recipient.maskedName}
+            </Txt>
+          </Row>
+          <Row last>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              Attempted
+            </Txt>
+            <Txt size={13} weight={700} tabular>
+              {timeLabel(new Date(attemptedAt).toISOString())}
+            </Txt>
+          </Row>
+        </RowGroup>
+
+        <Txt size={12} weight={500} color={color.inkFaint} tabular style={{ marginTop: space.md }}>
+          Ref {error.code}
+        </Txt>
+      </ScrollView>
+
+      <View style={{ gap: 10, paddingHorizontal: space.gutter, paddingTop: space.md }}>
+        <Button label="Choose another recipient" onPress={onChangeRecipient} />
+        <Button
+          label="Back to home"
+          variant="secondary"
+          height={48}
+          onPress={() => {
+            if (router.canDismiss()) router.dismissAll();
+            router.replace("/(tabs)/home");
+          }}
+        />
+      </View>
+      <HomeIndicator />
+    </Screen>
+  );
+}
+
+/**
+ * Outcome unknown: we asked, and never heard back.
+ *
+ * The hardest state to write honestly, because the tempting copy — "it failed",
+ * "try again" — is wrong in both directions. The request may well have posted;
+ * the transfer could be settling right now. So this screen refuses to claim an
+ * outcome, hands over a reference that identifies the attempt, says what is
+ * being done about it, and sends the user to the one place that will know.
+ */
+function OutcomeUnknown({
+  error,
+  reference,
+  recipient,
+  sourceAmountMinor,
+  sourceCurrency,
+  attemptedAt,
+}: {
+  error: unknown;
+  reference: string;
+  recipient: DraftRecipient;
+  sourceAmountMinor: number;
+  sourceCurrency: Currency;
+  attemptedAt: number;
+}) {
+  const router = useRouter();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(id);
+  }, [copied]);
 
   const lead =
     error instanceof ApiUnreachableError && error.timedOut
       ? "The connection timed out before we heard back."
-      : "We didn't hear back from CaribPay.";
+      : "We didn't hear back after sending your request.";
+
+  async function copy() {
+    await Clipboard.setStringAsync(reference);
+    setCopied(true);
+  }
+
   return (
-    <Notice
-      tone="pending"
-      title="We couldn't confirm this transfer"
-      body={`${lead} We don't know yet whether it went through — check your Transfers list first, and it will be there if it did.`}
-    />
+    <Screen edges={{ bottom: false }}>
+      <ScreenHeader title="Outcome unknown" />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.sm }}
+      >
+        <View style={{ alignItems: "center", gap: 10, marginTop: space.lg }}>
+          <View
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 30,
+              backgroundColor: color.pendingSoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="clock" size={26} color={color.pending} strokeWidth={2.2} />
+          </View>
+          <Txt size={22} weight={800} align="center" tracking={-0.02}>
+            We don&rsquo;t know yet
+          </Txt>
+          <Txt size={14} weight={500} color={color.inkMuted} align="center" leading={1.5}>
+            {lead} This transfer may have gone through, so don&rsquo;t start it again from scratch.
+          </Txt>
+        </View>
+
+        <RowGroup style={{ marginTop: space.xl }}>
+          <Row>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              Reference
+            </Txt>
+            <Txt size={15} weight={800} tabular>
+              {reference}
+            </Txt>
+          </Row>
+          <Row>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              Amount
+            </Txt>
+            <Txt size={13} weight={700} tabular>
+              {formatAmount(sourceAmountMinor, sourceCurrency)}
+            </Txt>
+          </Row>
+          <Row>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              To
+            </Txt>
+            <Txt size={13} weight={700} numberOfLines={1} style={{ flex: 1 }} align="right">
+              {recipient.maskedName}
+            </Txt>
+          </Row>
+          <Row last>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              Last seen
+            </Txt>
+            <Txt size={13} weight={700} tabular>
+              {timeLabel(new Date(attemptedAt).toISOString())}
+            </Txt>
+          </Row>
+        </RowGroup>
+
+        <View style={{ marginTop: space.md }}>
+          <Notice
+            tone="primary"
+            icon="info"
+            title="What we are doing about it"
+            body="If your request reached us it is already being worked through and will appear in your transfers. If it never arrived, nothing was held and nothing will happen. Either way this resolves without you doing anything."
+          />
+        </View>
+      </ScrollView>
+
+      <View style={{ gap: 10, paddingHorizontal: space.gutter, paddingTop: space.md }}>
+        <Button
+          label="Open my transfers"
+          onPress={() => {
+            if (router.canDismiss()) router.dismissAll();
+            router.replace("/(tabs)/activity");
+          }}
+        />
+        <Button
+          label={copied ? "Reference copied" : "Copy reference"}
+          icon={copied ? "check" : "copy"}
+          variant="secondary"
+          height={48}
+          onPress={() => void copy()}
+        />
+      </View>
+      <HomeIndicator />
+    </Screen>
+  );
+}
+
+/**
+ * The rate moved: what they would have received, and what they will.
+ *
+ * Two numbers side by side rather than one struck-through row, because the
+ * question being asked is a comparison and the eye should be able to make it in
+ * one movement. The sentence underneath does the subtraction so nobody has to —
+ * and it names the person, since "you receive 4.54 less" would be wrong: the
+ * payer sends the same amount either way.
+ */
+function WasNow({
+  was,
+  now,
+  currency,
+  firstName,
+}: {
+  was: number;
+  now: number;
+  currency: Currency;
+  firstName: string;
+}) {
+  const delta = now - was;
+  const better = delta >= 0;
+
+  return (
+    <View
+      style={[
+        {
+          marginTop: space.md,
+          backgroundColor: color.surface,
+          borderRadius: radius.card,
+          padding: 16,
+          gap: 12,
+        },
+        shadow.card,
+      ]}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Txt size={11} weight={700} color={color.inkFaint}>
+            WAS
+          </Txt>
+          <Txt size={18} weight={700} color={color.inkFaint} tabular numberOfLines={1}>
+            {formatAmount(was, currency)}
+          </Txt>
+        </View>
+        <Icon name="arrowRight" size={18} color={color.inkFaint} strokeWidth={2} />
+        <View style={{ flex: 1, gap: 4, alignItems: "flex-end" }}>
+          <Txt size={11} weight={700} color={color.inkMuted}>
+            NOW
+          </Txt>
+          <Txt size={18} weight={800} tabular numberOfLines={1}>
+            {formatAmount(now, currency)}
+          </Txt>
+        </View>
+      </View>
+
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: color.hairlineFaint,
+          paddingTop: 12,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <Icon
+          name={better ? "trendUp" : "trendDown"}
+          size={15}
+          color={better ? color.success : color.pending}
+          strokeWidth={2.2}
+        />
+        <Txt size={13} weight={600} style={{ flex: 1 }}>
+          {firstName} receives {formatAmount(Math.abs(delta), currency)} {better ? "more" : "less"}
+        </Txt>
+      </View>
+    </View>
   );
 }
 
@@ -121,6 +451,38 @@ export default function SendReviewScreen() {
     );
   }
 
+  // The switch answered no. A refusal and a silence are different outcomes with
+  // different actions, so each takes over the screen rather than sitting as a
+  // banner above a "Confirm & send" button that would repeat the mistake.
+  if (createTransfer.isError) {
+    const error = createTransfer.error;
+    if (error instanceof ApiRequestError && error.status < 500) {
+      return (
+        <Rejected
+          error={error}
+          recipient={recipient}
+          sourceAmountMinor={sourceAmountMinor}
+          sourceCurrency={sourceCurrency}
+          attemptedAt={createTransfer.submittedAt}
+          onChangeRecipient={() => {
+            reset();
+            router.replace("/send");
+          }}
+        />
+      );
+    }
+    return (
+      <OutcomeUnknown
+        error={error}
+        reference={shortReference(draft.idempotencyKey)}
+        recipient={recipient}
+        sourceAmountMinor={sourceAmountMinor}
+        sourceCurrency={sourceCurrency}
+        attemptedAt={createTransfer.submittedAt}
+      />
+    );
+  }
+
   const destCurrency = recipient.currency;
   const expired = crossCurrency && reviewedQuote !== null && remaining <= 0;
   const drifted =
@@ -183,17 +545,19 @@ export default function SendReviewScreen() {
         contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.sm }}
       >
         {needsReconfirm && effectiveQuote != null && reviewedQuote !== null && (
-          <Notice
-            tone="pending"
-            title="The rate moved while you were away"
-            body="Nothing has been sent. Here's the current rate — confirm to continue, or go back and change the amount."
-          />
-        )}
-
-        {createTransfer.isError && (
-          <View style={{ paddingTop: needsReconfirm ? space.md : 0 }}>
-            <SendError error={createTransfer.error} />
-          </View>
+          <>
+            <Notice
+              tone="pending"
+              title="The rate moved while you were away"
+              body="Nothing has been sent. Confirm to continue at the rate below, or go back and change the amount."
+            />
+            <WasNow
+              was={reviewedQuote.destAmountMinor}
+              now={effectiveQuote.destAmountMinor}
+              currency={destCurrency}
+              firstName={recipient.maskedName.split(" ")[0] ?? "They"}
+            />
+          </>
         )}
 
         {/* Recipient */}
@@ -227,37 +591,11 @@ export default function SendReviewScreen() {
             </Txt>
           </DetailRow>
 
-          {needsReconfirm && reviewedQuote !== null && (
-            <DetailRow label="Old quote">
-              <Txt
-                size={13}
-                weight={600}
-                color={color.inkFaint}
-                tabular
-                style={{ textDecorationLine: "line-through" }}
-              >
-                {formatAmount(reviewedQuote.destAmountMinor, destCurrency)}
-              </Txt>
-            </DetailRow>
-          )}
-
-          <DetailRow label={needsReconfirm ? "They receive now" : "They receive"}>
+          <DetailRow label="They receive">
             <Txt size={17} weight={800} color={color.link} tabular>
-              {destAmountMinor === undefined
-                ? "…"
-                : formatAmount(destAmountMinor, destCurrency)}
+              {destAmountMinor === undefined ? "…" : formatAmount(destAmountMinor, destCurrency)}
             </Txt>
           </DetailRow>
-
-          {needsReconfirm && reviewedQuote !== null && destAmountMinor !== undefined && (
-            <DetailRow label="Difference">
-              <Txt size={13} weight={700} color={color.pending} tabular>
-                {formatAmount(destAmountMinor - reviewedQuote.destAmountMinor, destCurrency, {
-                  sign: "always",
-                })}
-              </Txt>
-            </DetailRow>
-          )}
 
           {crossCurrency && (
             <DetailRow label={needsReconfirm ? "New rate" : "Rate (locked)"}>

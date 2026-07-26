@@ -146,23 +146,29 @@ export function groupedRowStyle(index: number, total: number): ViewStyle {
   };
 }
 
-/** One line of a RowGroup. `last` drops the divider. */
+/**
+ * One line of a RowGroup. `last` drops the divider; `alignTop` is for the rare
+ * row whose value wraps to several lines, where a centred label would float
+ * away from the thing it names.
+ */
 export function Row({
   children,
   last = false,
   onPress,
+  alignTop = false,
   paddingVertical = 14,
 }: {
   children: ReactNode;
   last?: boolean;
   onPress?: () => void;
+  alignTop?: boolean;
   paddingVertical?: number;
 }) {
   const body = (
     <View
       style={{
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: alignTop ? "flex-start" : "center",
         justifyContent: "space-between",
         gap: space.md,
         paddingVertical,

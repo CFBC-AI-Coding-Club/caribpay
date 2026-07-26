@@ -28,6 +28,31 @@ export function dateTimeLabel(iso: string): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${timeWithSeconds(iso)}`;
 }
 
+/** "14 Mar 2026" — a date with no time, for things that happened once. */
+export function shortDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * How long a transfer took, from initiation to settlement: "4 seconds".
+ *
+ * Whole seconds under a minute, because the claim being made is "this is fast"
+ * and "4.2 seconds" reads like a benchmark rather than an experience. Falls
+ * back to an em dash while the end timestamp is still missing.
+ */
+export function elapsedLabel(from: string, to: string | null): string {
+  if (to === null) return "—";
+  const ms = Date.parse(to) - Date.parse(from);
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? "" : "s"}`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
 /**
  * Compact recency for list rows: the clock for today, "Yesterday", then a date.
  * Keeps the newest rows scannable without repeating today's date on every line.

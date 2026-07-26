@@ -146,35 +146,75 @@ export function Timeline({ steps, markerSize = 28 }: { steps: Step[]; markerSize
   );
 }
 
-/** Compact dotted variant for the Transfer detail card. */
-export function TimelineCompact({ steps }: { steps: Step[] }) {
+/**
+ * Compressed variant for the transfer receipt.
+ *
+ * Same rail as `Timeline`, at 20pt with the timestamp pulled onto the label's
+ * own line. A receipt is read after the fact, so it wants the whole history
+ * visible at once rather than the roomy, one-step-at-a-time pacing of the live
+ * screen — but it keeps the connected rail, because dots alone lose the
+ * ordering and the break in the chain when something failed.
+ */
+export function TimelineCompact({ steps, markerSize = 20 }: { steps: Step[]; markerSize?: number }) {
   return (
-    <View style={{ gap: space.sm }}>
-      {steps.map((step) => (
-        <View key={step.label} style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor:
-                step.state === "failed"
-                  ? color.error
-                  : step.state === "done"
-                    ? color.success
-                    : "rgba(26,19,64,0.18)",
-            }}
-          />
-          <Txt size={13} weight={600} style={{ flex: 1 }}>
-            {step.label}
-          </Txt>
-          {step.detail !== undefined && (
-            <Txt size={12} weight={500} color={color.inkMuted} tabular>
-              {step.detail}
-            </Txt>
-          )}
-        </View>
-      ))}
+    <View>
+      {steps.map((step, index) => {
+        const last = index === steps.length - 1;
+        const next = steps[index + 1];
+        const connector =
+          step.state === "done" && next?.state === "failed"
+            ? color.errorBorder
+            : step.state === "done"
+              ? color.success
+              : "rgba(26,19,64,0.12)";
+
+        const labelColor =
+          step.state === "failed"
+            ? color.error
+            : step.state === "active"
+              ? color.link
+              : step.state === "upcoming"
+                ? color.inkFaint
+                : color.ink;
+
+        return (
+          <View key={step.label} style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ alignItems: "center" }}>
+              <Marker state={step.state} size={markerSize} />
+              {!last && (
+                <View style={{ width: 2, flex: 1, minHeight: 12, backgroundColor: connector }} />
+              )}
+            </View>
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: space.sm,
+                paddingBottom: last ? 0 : space.md,
+                minHeight: markerSize,
+              }}
+            >
+              <Txt size={13} weight={700} color={labelColor} style={{ flexShrink: 1 }}>
+                {step.label}
+              </Txt>
+              {step.detail !== undefined && (
+                <Txt
+                  size={12}
+                  weight={500}
+                  color={step.state === "upcoming" ? color.inkFaint : color.inkMuted}
+                  tabular
+                  numberOfLines={1}
+                  align="right"
+                  style={{ flex: 1 }}
+                >
+                  {step.detail}
+                </Txt>
+              )}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }

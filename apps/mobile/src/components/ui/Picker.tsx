@@ -23,6 +23,7 @@ export interface PickerOption<T extends string> {
 export function PickerSheet<T extends string>({
   visible,
   title,
+  subtitle,
   options,
   value,
   onSelect,
@@ -30,6 +31,8 @@ export function PickerSheet<T extends string>({
 }: {
   visible: boolean;
   title: string;
+  /** One line saying what the choice affects, where that isn't obvious. */
+  subtitle?: string;
   options: readonly PickerOption<T>[];
   value?: T;
   onSelect: (value: T) => void;
@@ -79,11 +82,19 @@ export function PickerSheet<T extends string>({
               justifyContent: "space-between",
               paddingHorizontal: space.gutter,
               paddingBottom: space.md,
+              gap: space.md,
             }}
           >
-            <Txt size={17} weight={800}>
-              {title}
-            </Txt>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Txt size={17} weight={800}>
+                {title}
+              </Txt>
+              {subtitle !== undefined && (
+                <Txt size={12} weight={500} color={color.inkMuted} leading={1.4}>
+                  {subtitle}
+                </Txt>
+              )}
+            </View>
             <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
               <Icon name="close" size={20} color={color.inkMuted} strokeWidth={2.4} />
             </Pressable>

@@ -114,7 +114,7 @@ export default function AddContactScreen() {
                   name={found.maskedName}
                   size={44}
                   country={found.countryCode}
-                  currency={found.currency}
+                  currency={found.currency ?? undefined}
                 />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt size={11} weight={600} color={color.success}>
@@ -125,7 +125,7 @@ export default function AddContactScreen() {
                   </Txt>
                   <Txt size={12} weight={500} color={color.inkMuted}>
                     {COUNTRY_NAMES[found.countryCode] ?? found.countryCode} ·{" "}
-                    {CURRENCY_SYMBOLS[found.currency]}
+                    {found.currency === null ? "No bank connected yet" : CURRENCY_SYMBOLS[found.currency]}
                   </Txt>
                 </View>
                 <Icon name="check" size={20} color={color.success} strokeWidth={2.6} />

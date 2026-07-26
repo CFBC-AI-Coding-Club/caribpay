@@ -2,8 +2,28 @@ import { create } from "zustand";
 import type { Currency, FxQuote, ResolveResponse } from "@caribpay/shared";
 import { randomId } from "@/lib/id";
 
-/** Who the money is going to, exactly as the directory reported them. */
-export type DraftRecipient = ResolveResponse;
+/**
+ * Who the money is going to, as the directory reported them — narrowed to
+ * someone who can actually be paid.
+ *
+ * The confirm screen is the only way into the amount screen and it only lets a
+ * payable recipient through, so the currency and institution are known from
+ * here on. Encoding that in the type keeps every downstream screen from
+ * re-checking a condition that cannot be false.
+ */
+export type DraftRecipient = ResolveResponse & {
+  payable: true;
+  currency: Currency;
+  institutionDisplayName: string;
+};
+
+/** Narrow a resolution to a payable recipient, or null. */
+export function asPayable(resolved: ResolveResponse): DraftRecipient | null {
+  if (!resolved.payable || resolved.currency === null || resolved.institutionDisplayName === null) {
+    return null;
+  }
+  return resolved as DraftRecipient;
+}
 
 interface DraftState {
   recipient: DraftRecipient | null;

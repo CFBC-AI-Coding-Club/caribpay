@@ -437,7 +437,12 @@ export default function HomeScreen() {
           <QuickActions />
           {others.length > 0 && (
             <>
-              <SectionHeader title="Other accounts" />
+              <SectionHeader
+                title="Other accounts"
+                action="Manage"
+                onAction={() => router.push("/accounts")}
+                style={{ marginHorizontal: space.gutter }}
+              />
               <Card padded={false} style={{ marginHorizontal: space.gutter, paddingHorizontal: 14 }}>
                 {others.map((account) => (
                   <OtherAccountRow key={account.id} account={account} />
@@ -450,6 +455,7 @@ export default function HomeScreen() {
             title="Regional transfers"
             action={recent.length > 0 ? "See all" : undefined}
             onAction={() => router.push("/(tabs)/activity")}
+            style={{ marginHorizontal: space.gutter }}
           />
           {recent.length === 0 ? (
             <View

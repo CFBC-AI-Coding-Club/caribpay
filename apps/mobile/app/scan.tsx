@@ -15,7 +15,6 @@ import {
 } from "@/components/ui";
 import { useResolveQr } from "@/api/hooks";
 import { useReducedMotion } from "@/lib/useReducedMotion";
-import { useDraftStore } from "@/stores/draft";
 
 /** Sweeping line inside the reticle while the camera is live. */
 function ScanLine() {
@@ -83,7 +82,6 @@ export default function ScanScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const resolve = useResolveQr();
-  const setRecipient = useDraftStore((s) => s.setRecipient);
 
   const [torch, setTorch] = useState(false);
   /** Set once a code is read, so the camera stops firing callbacks. */
@@ -263,10 +261,10 @@ export default function ScanScreen() {
         ) : (
           <View style={{ marginTop: 22, paddingHorizontal: 40 }}>
             <Txt size={15} weight={700} color={color.onDark} align="center">
-              Point at a CaribPay QR code
+              Point at their CaribPay code
             </Txt>
             <Txt size={13} weight={500} color={color.onDarkMuted} align="center" style={{ marginTop: 4 }}>
-              We'll prefill the recipient for you.
+              We fill in the recipient for you.
             </Txt>
           </View>
         )}

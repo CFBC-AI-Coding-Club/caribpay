@@ -329,7 +329,7 @@ export async function resolveKey(
   dbh: DbHandle,
   viewerUserId: string,
   rawKey: string,
-): Promise<ResolveResponse & { userId: string; accountId: string }> {
+): Promise<ResolveResponse & { userId: string; accountId: string | null }> {
   const parsed = parseDirectoryKey(rawKey);
   if (parsed === null) {
     throw new ApiError(422, "KEY_MALFORMED", "That is not an address, phone number, or email");
@@ -340,6 +340,7 @@ export async function resolveKey(
       keyValue: directoryKeys.valueNormalized,
       keyUserId: directoryKeys.userId,
       linkedAccountId: directoryKeys.linkedAccountId,
+      claimedAt: directoryKeys.createdAt,
       fullName: users.fullName,
       countryCode: users.countryCode,
     })
@@ -356,25 +357,43 @@ export async function resolveKey(
   }
 
   const account = await accountForKey(dbh, row.keyUserId, row.linkedAccountId);
+  const primary = await primaryVpaFor(dbh, row.keyUserId);
+  const base = {
+    key: row.keyValue,
+    maskedName: maskName(row.fullName),
+    primaryVpa: primary ?? row.keyValue,
+    countryCode: row.countryCode,
+    claimedAt: row.claimedAt.toISOString(),
+    userId: row.keyUserId,
+  };
+
+  if (account === null) {
+    // Real address, real person, nowhere for the money to land. The caller can
+    // say exactly that instead of showing a generic failure.
+    return {
+      ...base,
+      payable: false as const,
+      currency: null,
+      institutionDisplayName: null,
+      accountId: null,
+    };
+  }
+
   const [institution] = await dbh
     .select({ displayName: institutions.displayName })
     .from(institutions)
     .where(eq(institutions.id, account.institutionId));
-  const primary = await primaryVpaFor(dbh, row.keyUserId);
 
   return {
-    key: row.keyValue,
-    maskedName: maskName(row.fullName),
-    primaryVpa: primary ?? row.keyValue,
+    ...base,
+    payable: true as const,
     currency: account.currency,
     institutionDisplayName: institution?.displayName ?? "Unknown institution",
-    countryCode: row.countryCode,
-    userId: row.keyUserId,
     accountId: account.id,
   };
 }
 
-/** The account a key routes to: its own, or the owner's default. */
+/** The account a key routes to: its own, the owner's default, or none yet. */
 async function accountForKey(dbh: DbHandle, userId: string, linkedAccountId: string | null) {
   if (linkedAccountId !== null) {
     const [row] = await dbh
@@ -393,16 +412,9 @@ async function accountForKey(dbh: DbHandle, userId: string, linkedAccountId: str
         eq(linkedAccounts.status, "active"),
       ),
     );
-  if (fallback === undefined) {
-    // Inherent to the model: an address is only payable once its owner has
-    // linked a bank account. Distinct code so the UI can say so plainly.
-    throw new ApiError(
-      422,
-      "KEY_NOT_PAYABLE",
-      "That person has not connected a bank account yet",
-    );
-  }
-  return fallback;
+  // Null rather than a throw: an address with no account behind it is a state
+  // the payer should see explained, not an error.
+  return fallback ?? null;
 }
 
 export async function primaryVpaFor(dbh: DbHandle, userId: string): Promise<string | null> {

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import { color, space } from "@/theme";
 import { Txt } from "./Txt";
 
@@ -87,20 +87,25 @@ export function SectionHeader({
   action,
   onAction,
   meta,
+  style,
 }: {
   title: string;
   action?: string;
   onAction?: () => void;
   meta?: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   return (
     <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: space.md,
-      }}
+      style={[
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: space.md,
+        },
+        style,
+      ]}
     >
       <Txt size={17} weight={800}>
         {title}

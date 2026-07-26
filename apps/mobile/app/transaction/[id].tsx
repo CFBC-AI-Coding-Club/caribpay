@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { ScrollView, Share, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { formatAmount, formatRate, type Transaction } from "@caribpay/shared";
+import * as Clipboard from "expo-clipboard";
+import { formatAmount, formatRate, shortReference, type Transaction } from "@caribpay/shared";
 import { color, space } from "@/theme";
+import { Icon } from "@/components/Icon";
 import {
   Avatar,
   Button,
@@ -36,23 +39,39 @@ function DetailRow({ label, value, tone }: { label: string; value: string; tone?
   );
 }
 
+/**
+ * The same three steps the live status screen shows, in the same words.
+ *
+ * A receipt that renames the stages someone just watched makes them wonder
+ * whether they are looking at the same transfer, so the vocabulary is shared
+ * deliberately — only the timestamps get longer, since a receipt is read on a
+ * different day from the one it happened on.
+ */
 function timelineSteps(tx: Transaction): Step[] {
-  const terminal = tx.status === "completed" || tx.status === "failed";
+  const held =
+    tx.status === "debit_held" || tx.status === "credit_pending" || tx.status === "completed";
+  const done = tx.status === "completed";
+  const undone = tx.status === "reversed" || tx.status === "reversal_pending";
   const settledAt = tx.settledAt === null ? undefined : dateTimeLabel(tx.settledAt);
+
   return [
-    { label: "Initiated", detail: dateTimeLabel(tx.createdAt), state: "done" },
     {
-      label: "Pending settlement",
-      detail: terminal ? undefined : "In progress",
-      state: terminal ? "done" : "active",
+      label: "Held at your bank",
+      detail: dateTimeLabel(tx.createdAt),
+      state: tx.status === "failed" ? "failed" : held || undone ? "done" : "active",
     },
-    tx.status === "failed"
-      ? { label: "Settlement failed", detail: settledAt, state: "failed" }
-      : {
-          label: "Settled",
-          detail: settledAt,
-          state: tx.status === "completed" ? "done" : "upcoming",
-        },
+    {
+      label: "Cleared across the region",
+      detail: done ? settledAt : undone ? "Reversed" : "In progress",
+      state: done ? "done" : undone ? "failed" : held ? "active" : "upcoming",
+    },
+    tx.status === "failed" || undone
+      ? {
+          label: tx.status === "reversed" ? "Returned in full" : "Returning your money",
+          detail: tx.status === "reversed" ? settledAt : undefined,
+          state: tx.status === "reversed" ? "failed" : "active",
+        }
+      : { label: "Delivered", detail: settledAt, state: done ? "done" : "upcoming" },
   ];
 }
 
@@ -60,8 +79,14 @@ export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const transfer = useTransfer(id);
-  const setRecipient = useDraftStore((s) => s.setRecipient);
   const reset = useDraftStore((s) => s.reset);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   if (transfer.isPending) {
     return (
@@ -89,6 +114,12 @@ export default function TransactionDetailScreen() {
   const incoming = tx.direction === "in";
   const name = tx.counterparty?.displayName ?? "CaribPay";
   const crossCurrency = tx.sourceCurrency !== tx.destCurrency;
+  const reference = shortReference(tx.id);
+
+  async function copyReference() {
+    await Clipboard.setStringAsync(reference);
+    setCopied(true);
+  }
 
   // The leg that belongs to this user, signed the way they experienced it.
   const ownAmount = incoming ? tx.destAmountMinor : -tx.sourceAmountMinor;
@@ -102,7 +133,7 @@ export default function TransactionDetailScreen() {
         `${formatAmount(tx.sourceAmountMinor, tx.sourceCurrency)} → ${formatAmount(tx.destAmountMinor, tx.destCurrency)}`,
         tx.fxRateUsed === null ? null : formatRate(tx.fxRateUsed, tx.sourceCurrency, tx.destCurrency),
         "Fee: free",
-        `Reference: ${tx.id}`,
+        `Reference: ${reference}`,
       ]
         .filter((line): line is string => line !== null)
         .join("\n"),
@@ -194,13 +225,27 @@ export default function TransactionDetailScreen() {
           {tx.failureReason !== null && (
             <DetailRow label="Failure" value={tx.failureReason} tone={color.errorText} />
           )}
-          <Row paddingVertical={12} last>
+          {/*
+            The short reference, not the uuid. This is the string someone reads
+            down a phone line or types into a support form, and it is derived
+            from the id rather than being a second identifier — so it stays
+            correct without anything having to keep the two in step. Tap to copy.
+          */}
+          <Row paddingVertical={12} last onPress={() => void copyReference()}>
             <Txt size={13} weight={600} color={color.inkMuted}>
               Reference
             </Txt>
-            <Txt size={12} weight={700} tabular numberOfLines={1} style={{ flexShrink: 1 }}>
-              {tx.id}
-            </Txt>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Txt size={15} weight={800} tabular>
+                {reference}
+              </Txt>
+              <Icon
+                name={copied ? "check" : "copy"}
+                size={15}
+                color={copied ? color.success : color.inkFaint}
+                strokeWidth={2}
+              />
+            </View>
           </Row>
         </RowGroup>
 

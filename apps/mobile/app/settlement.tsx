@@ -50,7 +50,7 @@ export default function SettlementScreen() {
             />
           </View>
 
-          <SectionHeader title="Bank positions" />
+          <SectionHeader title="Bank positions" style={{ marginHorizontal: space.gutter }} />
           {open.length === 0 ? (
             <View
               style={{
@@ -102,7 +102,7 @@ export default function SettlementScreen() {
             </Txt>
           )}
 
-          <SectionHeader title="Switch FX book" />
+          <SectionHeader title="Switch FX book" style={{ marginHorizontal: space.gutter }} />
           <Card padded={false} style={{ marginHorizontal: space.gutter, paddingHorizontal: 14 }}>
             {(positions.data?.fxBook ?? []).map((fx, index, all) => (
               <ListRow

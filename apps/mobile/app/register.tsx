@@ -3,6 +3,7 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } fr
 import { useRouter } from "expo-router";
 import {
   COUNTRY_NAMES,
+  CURRENCY_NAMES,
   CURRENCY_SYMBOLS,
   SUPPORTED_COUNTRIES,
   homeCurrencyFor,
@@ -25,7 +26,7 @@ import { ApiRequestError } from "@/api/client";
 const COUNTRY_OPTIONS = SUPPORTED_COUNTRIES.map((code) => ({
   value: code,
   label: COUNTRY_NAMES[code] ?? code,
-  detail: `${CURRENCY_SYMBOLS[homeCurrencyFor(code)]} · ${homeCurrencyFor(code)}`,
+  detail: `${CURRENCY_SYMBOLS[homeCurrencyFor(code)]} · ${CURRENCY_NAMES[homeCurrencyFor(code)]}`,
   leading: <Flag country={code} size={30} />,
 }));
 
@@ -179,6 +180,7 @@ export default function RegisterScreen() {
       <PickerSheet
         visible={pickerOpen}
         title="Where do you bank?"
+        subtitle="Sets the currency of your CaribPay address. You can connect accounts in other countries afterwards."
         options={COUNTRY_OPTIONS}
         value={country}
         onSelect={setCountry}

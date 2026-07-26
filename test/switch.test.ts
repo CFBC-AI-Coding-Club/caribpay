@@ -267,6 +267,17 @@ describe("failure branches", () => {
     expect(await outstandingHoldCount(bank)).toBe(0);
   });
 
+  test("a transfer to an unpayable address is refused before any hold", async () => {
+    // Resolve reports these rather than throwing, so the transfer service is
+    // the only thing standing between an unpayable address and a stranded hold.
+    await t.client`UPDATE linked_accounts SET status = 'closed' WHERE user_id = ${devon.userId}::uuid`;
+    const { res } = await send();
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("KEY_NOT_PAYABLE");
+    expect(await outstandingHoldCount(bank)).toBe(0);
+  });
+
   test("a transfer beyond the payer bank's debit cap is declined before any hold", async () => {
     await t.client`
       UPDATE system_accounts SET debit_cap_minor = 100

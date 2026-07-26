@@ -1,12 +1,18 @@
+import { useMemo } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
-import { CURRENCY_NAMES, formatAmount, type LinkedAccount } from "@caribpay/shared";
+import {
+  COUNTRY_NAMES,
+  CURRENCY_NAMES,
+  formatAmount,
+  type LinkedAccount,
+} from "@caribpay/shared";
 import { color, radius, space } from "@/theme";
 import { Flag } from "@/components/Flag";
+import { Icon } from "@/components/Icon";
 import {
   Button,
   Card,
-  EmptyState,
   ErrorState,
   HomeIndicator,
   Loading,
@@ -16,7 +22,7 @@ import {
   Skeleton,
   Txt,
 } from "@/components/ui";
-import { useAccountBalance, useAccounts } from "@/api/hooks";
+import { useAccountBalance, useAccounts, useInstitutions } from "@/api/hooks";
 
 /**
  * One card per account, because each bank answers separately: a card can be
@@ -86,6 +92,120 @@ function AccountCard({ account }: { account: LinkedAccount }) {
   );
 }
 
+/**
+ * Nothing connected yet — so the screen argues for connecting something.
+ *
+ * The argument is coverage, and coverage is a claim that has to be shown rather
+ * than asserted: a number and a country list can both be checked against the
+ * picker on the next screen. "Works across the Caribbean" is a slogan; twelve
+ * flags with bank counts beside them is evidence.
+ */
+function NoAccounts({ onConnect }: { onConnect: () => void }) {
+  const institutions = useInstitutions();
+
+  const byCountry = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const i of institutions.data ?? []) {
+      if (!i.supportsAccountLinking) continue;
+      counts.set(i.countryCode, (counts.get(i.countryCode) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [institutions.data]);
+
+  const bankCount = byCountry.reduce((sum, [, n]) => sum + n, 0);
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        flexGrow: 1,
+        paddingHorizontal: space.gutter,
+        paddingTop: space.xl,
+        paddingBottom: space.md,
+      }}
+    >
+      <View style={{ alignItems: "center", gap: 10 }}>
+        <View
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 32,
+            backgroundColor: color.surface,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="card" size={30} color={color.link} strokeWidth={1.8} />
+        </View>
+        <Txt size={22} weight={800} align="center" tracking={-0.02}>
+          Connect your bank
+        </Txt>
+        <Txt size={14} weight={500} color={color.inkMuted} align="center" leading={1.5}>
+          CaribPay moves money between banks and never holds it. Your money stays where it is until
+          you send it.
+        </Txt>
+      </View>
+
+      {byCountry.length > 0 && (
+        <Card style={{ marginTop: space.xl, gap: space.md }}>
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+            <Txt size={20} weight={800} tabular>
+              {bankCount}
+            </Txt>
+            <Txt size={13} weight={600} color={color.inkMuted}>
+              banks across {byCountry.length} countries
+            </Txt>
+          </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: space.sm,
+              borderTopWidth: 1,
+              borderTopColor: color.hairlineFaint,
+              paddingTop: space.md,
+            }}
+          >
+            {byCountry.map(([countryCode, count]) => (
+              <View
+                key={countryCode}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: color.bg,
+                  borderRadius: radius.pill,
+                  paddingLeft: 4,
+                  paddingRight: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <Flag country={countryCode} size={22} />
+                <Txt size={12} weight={700}>
+                  {COUNTRY_NAMES[countryCode] ?? countryCode}
+                </Txt>
+                <Txt size={12} weight={600} color={color.inkMuted} tabular>
+                  {count}
+                </Txt>
+              </View>
+            ))}
+          </View>
+        </Card>
+      )}
+
+      <View style={{ flex: 1 }} />
+
+      <Button
+        label="Connect an account"
+        icon="plus"
+        onPress={onConnect}
+        style={{ marginTop: space.xl }}
+      />
+    </ScrollView>
+  );
+}
+
 export default function AccountsScreen() {
   const router = useRouter();
   const accounts = useAccounts();
@@ -105,14 +225,7 @@ export default function AccountsScreen() {
       ) : accounts.isPending ? (
         <Loading label="Loading your accounts…" />
       ) : list.length === 0 ? (
-        <EmptyState
-          icon="card"
-          title="No accounts connected"
-          body="CaribPay moves money between banks and never holds it. Connect an account to send and receive."
-          actionLabel="Connect an account"
-          actionIcon="plus"
-          onAction={() => router.push("/accounts/link")}
-        />
+        <NoAccounts onConnect={() => router.push("/accounts/link")} />
       ) : (
         <ScrollView
           style={{ flex: 1 }}

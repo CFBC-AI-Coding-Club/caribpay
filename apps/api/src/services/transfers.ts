@@ -81,6 +81,16 @@ export async function createTransfer(
       `That account holds ${payerAccount.currency}, not ${input.sourceCurrency}`,
     );
   }
+  // Resolve now reports an unpayable address rather than throwing, so the guard
+  // has to live here: without it a transfer would be written with a null payee
+  // account and fail inside the saga, after the payer's money was reserved.
+  if (!payee.payable || payee.accountId === null) {
+    throw new ApiError(
+      422,
+      "KEY_NOT_PAYABLE",
+      "They have not connected a bank account yet",
+    );
+  }
   if (payee.currency !== input.destCurrency) {
     throw new ApiError(
       422,

@@ -88,9 +88,18 @@ export const resolveResponseSchema = z.object({
   maskedName: z.string(),
   /** The payee's primary VPA, for display and for saving as a contact. */
   primaryVpa: z.string(),
-  /** The currency of the account this key routes to. */
-  currency: z.enum(SUPPORTED_CURRENCIES),
-  institutionDisplayName: z.string(),
+  /**
+   * False when the address is real and claimed but has no bank account behind
+   * it yet. Resolving still succeeds: "who is this and why can't they be paid"
+   * is a useful answer, and failing the request outright would leave the payer
+   * looking at a generic error about a person who exists.
+   */
+  payable: z.boolean(),
+  /** Null when not payable — there is no account, so there is no currency. */
+  currency: z.enum(SUPPORTED_CURRENCIES).nullable(),
+  institutionDisplayName: z.string().nullable(),
   countryCode: z.string().length(2),
+  /** When the address was claimed. Evidence that it is genuinely theirs. */
+  claimedAt: z.string(),
 });
 export type ResolveResponse = z.infer<typeof resolveResponseSchema>;

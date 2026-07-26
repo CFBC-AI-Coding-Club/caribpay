@@ -12,6 +12,7 @@ import {
   IconButton,
   groupedRowStyle,
   ListRow,
+  Pill,
   Screen,
   SearchField,
   Skeleton,
@@ -253,10 +254,22 @@ export default function ContactsScreen() {
                   />
                 }
                 title={contact.displayName}
-                subtitle={
-                  contact.currency === null
-                    ? `${contact.primaryVpa ?? contact.savedKey} · no bank connected yet`
-                    : `${contact.primaryVpa ?? contact.savedKey} · ${CURRENCY_SYMBOLS[contact.currency]}`
+                subtitle={contact.primaryVpa ?? contact.savedKey}
+                /*
+                  The currency is what they will actually be paid in, so it is a
+                  pill rather than more text after a middot: it is a different
+                  kind of fact from the address, and the row should not make you
+                  read to the end of a sentence to find it.
+                */
+                subtitleAccessory={
+                  contact.currency === null ? (
+                    <Pill tone="neutral" label="No bank yet" />
+                  ) : (
+                    <Pill
+                      tone="neutral"
+                      label={`${CURRENCY_SYMBOLS[contact.currency]} ${contact.currency}`}
+                    />
+                  )
                 }
                 trailing={
                   <Pressable

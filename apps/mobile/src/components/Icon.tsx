@@ -79,6 +79,10 @@ const PATHS = {
   ],
   image: ["M3.5 15 L8.5 10.5 L13 14.5 L16 12 L20.5 16"],
   shieldCheck: ["M12 3.5 L19 6 V12 C19 16.2 15.9 19.4 12 20.5 C8.1 19.4 5 16.2 5 12 V6 Z"],
+  arrowRight: ["M4 12 H19", "M13 6 L19 12 L13 18"],
+  /** A rate that moved in the payee's favour, and one that did not. */
+  trendUp: ["M4 16.5 L10 10.5 L13.5 14 L20 7.5", "M15 7.5 H20 V12.5"],
+  trendDown: ["M4 7.5 L10 13.5 L13.5 10 L20 16.5", "M15 16.5 H20 V11.5"],
 } as const;
 
 /** Extra shapes some glyphs need beyond a stroked path. */

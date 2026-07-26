@@ -4,7 +4,42 @@ import { useRouter } from "expo-router";
 import { color, space } from "@/theme";
 import { Button, Notice, SheetScreen, TextField, Txt } from "@/components/ui";
 import { useLogin } from "@/api/hooks";
-import { ApiRequestError } from "@/api/client";
+import { ApiRequestError, ApiUnreachableError } from "@/api/client";
+
+/**
+ * Three failures that need different words.
+ *
+ * A wrong password is never split into "no such email" and "wrong password" —
+ * that turns the login form into a way to find out who has an account. An
+ * unreachable server is not the user's mistake and must not read like one, so
+ * it says so plainly and leaves the form filled in.
+ */
+function loginError(error: unknown): { title: string; body: string } {
+  if (error instanceof ApiUnreachableError) {
+    return {
+      title: "We couldn't reach CaribPay",
+      body: error.timedOut
+        ? "The connection timed out. Check your signal and try again — nothing was sent."
+        : "Check your connection and try again. Your details are still here.",
+    };
+  }
+  if (error instanceof ApiRequestError && error.status === 401) {
+    return {
+      title: "That didn't match",
+      body: "The email and password don't go together. Check both, and mind the caps lock.",
+    };
+  }
+  if (error instanceof ApiRequestError && error.status === 429) {
+    return {
+      title: "Too many attempts",
+      body: "Wait a minute before trying again. This protects your account from someone guessing.",
+    };
+  }
+  return {
+    title: "Could not log you in",
+    body: error instanceof Error ? error.message : "Something went wrong. Try again.",
+  };
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -46,17 +81,7 @@ export default function LoginScreen() {
           contentContainerStyle={{ padding: space.gutter, paddingTop: 30, gap: space.lg }}
           keyboardShouldPersistTaps="handled"
         >
-          {login.isError && (
-            <Notice
-              tone="error"
-              title="Could not log you in"
-              body={
-                login.error instanceof ApiRequestError && login.error.status === 401
-                  ? "That email and password do not match an account."
-                  : login.error.message
-              }
-            />
-          )}
+          {login.isError && <Notice tone="error" {...loginError(login.error)} />}
 
           <TextField
             label="Email"

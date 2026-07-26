@@ -236,11 +236,23 @@ describe("resolving", () => {
     expect(await errorCode(res)).toBe("OWN_KEY");
   });
 
-  test("says plainly when someone has no bank account connected", async () => {
+  test("reports an unpayable address rather than failing the lookup", async () => {
+    // The payer should learn who this is and why they cannot be paid. Failing
+    // the request would show a generic error about a person who exists.
     await t.client`UPDATE linked_accounts SET status = 'closed' WHERE user_id = ${devon.userId}::uuid`;
     const tok = await token("amara@test.local");
     const res = await api("/api/v1/directory/resolve?key=devon%40caribpay", { token: tok });
-    expect(await errorCode(res)).toBe("KEY_NOT_PAYABLE");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.payable).toBe(false);
+    expect(body.maskedName).toBe("Devon C.");
+    expect(body.currency).toBeNull();
+    expect(body.institutionDisplayName).toBeNull();
+    expect(body.claimedAt).toBeTypeOf("string");
+    // Still withholds everything it withholds when payable.
+    expect(body).not.toHaveProperty("accountId");
+    expect(body).not.toHaveProperty("userId");
   });
 
   test("is rate limited", async () => {
