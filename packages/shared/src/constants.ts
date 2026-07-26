@@ -107,6 +107,59 @@ export type TransactionStatus = (typeof TRANSACTION_STATUSES)[number];
 export const KYC_STATUSES = ["unverified", "pending", "verified"] as const;
 export type KycStatus = (typeof KYC_STATUSES)[number];
 
+/**
+ * The switch's transfer lifecycle. A transfer is a conversation with two banks,
+ * so the states track where that conversation has reached:
+ *
+ *   initiated → debit_pending → debit_held → credit_pending → completed
+ *
+ * and on failure, either `failed` (the hold was refused, nothing was posted and
+ * nothing needs undoing) or `reversal_pending → reversed` (the hold exists and
+ * must be released). Held funds sitting in someone's real bank account are the
+ * worst state to be stuck in, so `reversal_pending` is retried to exhaustion.
+ *
+ * Declared here separately from TRANSACTION_STATUSES, which still describes the
+ * wallet-era rows; the two are merged in the migration that adds these values.
+ */
+export const TRANSFER_LIFECYCLE_STATUSES = [
+  "initiated",
+  "debit_pending",
+  "debit_held",
+  "credit_pending",
+  "completed",
+  "failed",
+  "reversal_pending",
+  "reversed",
+] as const;
+export type TransferLifecycleStatus = (typeof TRANSFER_LIFECYCLE_STATUSES)[number];
+
+/** States from which no further transition is possible. */
+export const TERMINAL_TRANSFER_STATUSES = ["completed", "failed", "reversed"] as const;
+
+export const DIRECTORY_KEY_TYPES = ["vpa", "phone", "email"] as const;
+export type DirectoryKeyType = (typeof DIRECTORY_KEY_TYPES)[number];
+
+/** UPI and Pix both cap the number of addresses one person may hold. */
+export const MAX_ACTIVE_DIRECTORY_KEYS = 5;
+
+/**
+ * Whether a member institution can be registered against today. Only CaribPay
+ * is `active`; every real bank is seeded `planned`, so nobody can claim
+ * `someone@sknanb` and imply a relationship we do not have.
+ */
+export const PSP_STATUSES = ["active", "planned"] as const;
+export type PspStatus = (typeof PSP_STATUSES)[number];
+
+export const LINKED_ACCOUNT_STATUSES = ["active", "suspended", "closed"] as const;
+export type LinkedAccountStatus = (typeof LINKED_ACCOUNT_STATUSES)[number];
+
+export const NOTIFICATION_TYPES = [
+  "transfer_received",
+  "transfer_failed",
+  "transfer_reversed",
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
 export const COUNTRY_TO_CURRENCY: Record<string, Currency> = {
   // Eastern Caribbean dollar zone
   AG: "XCD",
