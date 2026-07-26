@@ -1,7 +1,10 @@
 # Implementation Plan v2 — Overlay Switch Architecture
 
-Status: **awaiting approval**. No code written yet. Supersedes plan v1; surviving v1 analysis is
-carried forward in Part 0.
+Status: **approved 26 July 2026.** Supersedes plan v1; surviving v1 analysis is carried forward in
+Part 0. Decisions taken in review are recorded in Part 10.
+
+Fallback secured before any of this begins: `v0.1.0-wallet-demo` tags the working wallet prototype,
+and `deploy/fallback.md` stands it up on an isolated database, Redis index and port.
 
 Read against: `OVERVIEW.md`, `PRODUCT.md`, `DESIGN.md`, `DEMO.md`, `RUNNING.md`, plan v1,
 `packages/shared/`, all of `apps/api/src/`, the five migrations, both seeds, `reconcile.ts`,
@@ -122,9 +125,14 @@ the per-currency invariant holds trivially, but the account itself carries a gro
 That is a truthful representation of running an FX book, and it is a good answer if we have one
 ready. It is a bad look if a judge finds it first.
 
-**Recommendation:** seed `fx_liquidity` with an explicit opening position per currency, and have
+**Decided:** seed `fx_liquidity` with an explicit opening position per currency, and have
 `bun run settle` print the switch's FX exposure as its own line. Then "who carries the FX risk" has
 an answer on screen: we do, and here is the number.
+
+Size the opening position **large enough that demo transfers read as small against the book**. An
+exposure line that looks like unbounded accumulation invites a worse follow-up than one that looks
+like a managed position — and the managed reading is where the tourist hard-currency inflow thesis
+becomes the answer rather than an excuse.
 
 Note also that `reconcile`'s "every currency nets to zero" is *trivially* true given the
 `postLedgerEntries` invariant — it can never fail. The check with teeth is **per-account positions
@@ -165,29 +173,49 @@ August. Four students, wanting rehearsal time.
 
 I am not going to tell you it fits, because I do not think it does at full scope.
 
-**What I would do instead** — carve an explicit spine that is demoable end to end, and treat
-everything else as layers on top:
+**Resolved in review, and the calendar is worse than the estimate assumed.** 26 July → 26 August is
+not continuous: the Youth Summit runs 10–14 August and you are Operations Manager, so 8–16 August is
+gone once prep and teardown are counted. Real availability is **~2 weeks, a 9-day hole, then ~1.5
+weeks.**
 
-| | Phases | Gives you |
+That dictates a shape rather than merely arguing for one:
+
+- **Phases 1–4 must be finished before 8 August.** The destructive migration and the saga are the
+  only work here that cannot survive being half-done across an interruption. Returning on 17 August
+  to a partially-rewritten transfer service with `wallets` already dropped is the scenario that loses
+  the demo.
+- **Phases 5 and 6 are spine, not a second tier.** §1.9's own argument — that they cannot be cut —
+  means they are not a layer. A switch with a rough mobile surface and a working `bun run settle`
+  demonstrates the thesis; a polished app that cannot show netting does not.
+
+**Spine = 1, 2, 3, 4, 5, 6, minimal 7, 9 ≈ 19.5 days.** Genuinely cuttable: mobile depth,
+notifications, docs polish.
+
+**Parallelisation.** Phases 3–6 share the ledger and must run sequentially, but two tracks split off
+cleanly:
+
+| Track | Work | Depends on |
 |---|---|---|
-| **Spine** | 1, 2, 3, 4, 7(minimal), 9 | Link account → live bank balance → send by VPA → hold/credit/confirm → reversal works. The switch thesis is fully demonstrated. |
-| **The pitch** | 5, 6 | Clearing ledger on bank positions, `bun run settle`, the netting summary. **This is what makes it a switch rather than an app**, so it cannot be cut — but it can land after the spine is stable. |
-| **Polish** | 8, 10, mobile depth | Notifications, docs, screen quality. |
+| A (two strongest) | 3 → 4 → 5 → 6 sequentially | phase 2 types |
+| B | phase 1 `apps/mock-bank`, then phase 9 seeds | nothing |
+| C | phase 7 mobile, scaffolded against phase 2's Zod types before the API exists | phase 2 |
 
-That ordering means that if you run out of time you ship a working switch with a netting CLI and a
-thinner mobile surface, rather than a half-built saga. The alternative — building in the prompt's
-order and stopping wherever you land — risks stopping inside phase 4, which is the one phase that
-cannot be half-done.
+Phase 2 is therefore the true critical path — it unblocks all three tracks and should be done first
+and fast, by one person, in a day and a half.
 
-### 1.10 I would not cut cross-currency, ever
+### 1.10 Cross-currency is off the cut list entirely — confirmed
 
 Your cut line ends with "cross-currency FX legs (keep same-currency)". Cross-currency **is** the
 positioning — `PRODUCT.md` puts "no US dollar is in the route" among the two load-bearing claims, and
 the XCD → JMD pair is the entire demo. A same-currency-only switch is a domestic ACH clone.
 
-**Recommended cut order instead:** notifications polish → settlement *screen* (keep the CLI) →
-prefunded caps → phone/email directory keys (VPA only) → mobile depth on the key-management screen.
-Never cut: cross-currency, the reversal path, the recovery sweeper.
+**Cut order:** notifications polish → settlement *screen* (keep the CLI) → prefunded caps →
+phone/email directory keys (VPA only) → mobile depth on the key-management screen. Never cut:
+cross-currency, the reversal path, the recovery sweeper.
+
+There is also almost nothing to save by cutting cross-currency: it is the same hold/credit sequence
+with two ledger legs instead of one, against an FX quote service that already exists. All of the
+risk, none of the savings.
 
 ### 1.11 Smaller notes
 
@@ -311,23 +339,30 @@ Root `package.json` gains `dev:bank`, `settle`, and bank migrate/seed scripts.
 
 ---
 
-## Part 8 — Sequencing and estimate
+## Part 8 — Sequencing against the calendar
 
-| Phase | Work | Est. |
-|---|---|---|
-| 1 | `apps/mock-bank`: service, schema, endpoints, idempotency, seeds, tests | 3 d |
-| 2 | shared: directory, VPA, skeletons, reserved, idempotency keys, schemas | 1.5 d |
-| 3 | api: destructive migration, delete wallets, institutions/keys/accounts, directory service, connector | 3.5 d |
-| 4 | transfer saga + worker + **recovery sweeper**, all branches tested | 4 d |
-| 5 | clearing ledger on bank positions, caps, extend reconcile | 2 d |
-| 6 | netting cycle, `bun run settle`, positions endpoint | 2 d |
-| 7 | mobile: link, live balance, send, receive, QR, keys | 4 d |
-| 8 | notifications, api + mobile | 1.5 d |
-| 9 | seeds and demo data across both services, `SimulatedNotice` | 1.5 d |
-| 10 | docs rewrite incl. new demo script | 1.5 d |
+Availability: **27 July – 7 August** (~2 weeks), **8–16 August gone** (Youth Summit), **17–25 August**
+(~1.5 weeks), judging **26–27 August**.
 
-**≈ 24.5 days sequential**, and phases 3–6 are hard to parallelise because they share the ledger.
-See §1.9 — I recommend committing to the spine first and layering the rest.
+| Phase | Work | Est. | Track | Deadline |
+|---|---|---|---|---|
+| 2 | shared: directory, VPA, skeletons, reserved, **deterministic step keys**, schemas | 1.5 d | — | **29 Jul** — critical path, unblocks A and C |
+| 1 | `apps/mock-bank`: service, schema, endpoints, idempotency, seeds, tests | 3 d | B | 1 Aug |
+| 3 | api: destructive migration, delete wallets, institutions/keys/accounts, directory service, connector | 3.5 d | A | 3 Aug |
+| 4 | transfer saga + worker + **recovery sweeper**, every branch tested | 4 d | A | **7 Aug — hard stop** |
+| 5 | clearing ledger on bank positions, caps, extend reconcile | 2 d | A | 19 Aug |
+| 6 | netting cycle, `bun run settle`, positions endpoint | 2 d | A | 21 Aug |
+| 7 | mobile: link, live balance, send, receive, QR, keys | 4 d | C | 22 Aug |
+| 9 | seeds and demo data across both services, `SimulatedNotice` | 1.5 d | B | 23 Aug |
+| 8 | notifications, api + mobile | 1.5 d | cuttable | 24 Aug |
+| 10 | docs rewrite incl. new demo script | 1.5 d | cuttable | 25 Aug |
+
+**Spine (1–6, minimal 7, 9) ≈ 19.5 days.** Phases 1–4 land before the 8 August hole; nothing
+half-finished is carried across it.
+
+**Checkpoints.** 7 August: phases 1–4 complete, saga green, `reconcile` clean, tree committed and
+tagged — the state to walk away from. 20 August: the go/no-go on fallback versus pivot
+(`deploy/fallback.md`).
 
 ---
 
@@ -350,14 +385,29 @@ the api database and fails on any column matching `balance`. It is also a good s
 
 ---
 
-## Questions before Phase 1
+## Part 10 — Decisions taken in review (26 July 2026)
 
-1. **Scope (§1.9)** — do you accept the spine-first ordering, or do you want the prompt's order kept?
-   This is the decision that most affects whether there is a demo on 26 August.
-2. **Cut line (§1.10)** — confirm cross-currency comes out of the cut list entirely?
-3. **Recovery sweeper (§1.3)** — confirm it is in scope for phase 4. It is roughly a day and the
-   system is not honest without it.
-4. **FX book (§1.6)** — seed an opening position and report exposure in `settle`, or leave
-   `fx_liquidity` unfunded and explain it verbally?
-5. **Destructive migration (§1.4)** — confirm you accept that all existing transfer history is
-   dropped and the demo world is reseeded.
+1. **Spine-first, with 5 and 6 promoted into the spine.** Phases 1–4 complete before 8 August.
+   Parallel tracks per §1.9.
+2. **Cross-currency is off the cut list.** It is the positioning, and cutting it saves almost
+   nothing — the same hold/credit sequence with two ledger legs instead of one.
+3. **Recovery sweeper in scope, phase 4.** §1.1 and §1.3 are one decision: deterministic step keys
+   are what make the sweeper possible, because replaying the credit under the original key is
+   simultaneously the query and the fix. That is why §1.2 needs no extra endpoint and neither does
+   the sweeper.
+   **Demo it deliberately** — close the laptop mid-transfer, reopen, let it resolve on stage. Most
+   student prototypes fall over when you do that.
+4. **FX book seeded and reported**, sized so demo transfers read small against it (§1.6). Reconcile's
+   teeth are positions-against-caps and derived-versus-recorded-cycles, not the trivially-true
+   per-currency assertion.
+5. **Destructive migration accepted**, on two conditions: it is its own commit immediately after a
+   green run, and the commit before it is tagged. Tag `v0.1.0-wallet-demo` already exists.
+
+## Part 11 — Fallback
+
+`deploy/fallback.md`. The pivot is a bet that can be lost without losing the competition, but only
+if the fallback is standing before migration 0005. Three isolation requirements, two of which fail
+silently: separate database (0005 drops `wallets`), separate Redis index (shared BullMQ prefix means
+the two settlement workers eat each other's jobs), separate port.
+
+Rehearse it on the actual phone before 8 August. A fallback nobody has run is not a fallback.
