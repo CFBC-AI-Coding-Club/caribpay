@@ -1,5 +1,5 @@
-import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
-import { color, radius, shadow, space } from "@/theme";
+import { Platform, Pressable, Switch, View, type StyleProp, type ViewStyle } from "react-native";
+import { color, radius, space, TOUCH_TARGET } from "@/theme";
 import { Txt } from "./Txt";
 
 /** Pill-in-a-track segmented control — Send (Contact/Address/Scan), Add contact. */
@@ -38,14 +38,15 @@ export function Segmented<T extends string>({
             style={[
               {
                 flex: 1,
-                height: 44,
+                minHeight: TOUCH_TARGET,
+                paddingVertical: 6,
                 borderRadius: radius.chip,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: active ? color.surface : "transparent",
               },
               active && {
-                shadowColor: "#000",
+                shadowColor: color.ink,
                 shadowOpacity: 0.08,
                 shadowRadius: 3,
                 shadowOffset: { width: 0, height: 1 },
@@ -83,12 +84,17 @@ export function FilterChips<T extends string>({
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
+            // hitSlop rather than a taller pill: the chip row's visual rhythm
+            // comes from the board, but the tappable area still has to clear the
+            // platform floor.
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             style={{
               backgroundColor: active ? color.interactive : color.surface,
               borderWidth: active ? 0 : 1,
               borderColor: "rgba(26,19,64,0.09)",
               paddingHorizontal: 14,
               paddingVertical: 8,
+              justifyContent: "center",
               borderRadius: radius.pill,
             }}
           >
@@ -102,6 +108,15 @@ export function FilterChips<T extends string>({
   );
 }
 
+/**
+ * The real platform switch, brand-tinted.
+ *
+ * This was a hand-rolled pill until a platform audit: it carried no brand
+ * expression the system colour couldn't, and it matched neither the iOS switch
+ * (51×31, distinctive thumb) nor Material 3's (52×32, icon in the thumb) — so a
+ * fluent user on either platform read it as an off-spec control for nothing.
+ * `Switch` renders each platform's own, themed through its track colour.
+ */
 export function Toggle({
   value,
   onChange,
@@ -112,29 +127,14 @@ export function Toggle({
   accessibilityLabel: string;
 }) {
   return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
+    <Switch
+      value={value}
+      onValueChange={onChange}
       accessibilityLabel={accessibilityLabel}
-      onPress={() => onChange(!value)}
-      hitSlop={8}
-      style={{
-        width: 48,
-        height: 28,
-        borderRadius: radius.pill,
-        backgroundColor: value ? color.interactive : color.disabledBg,
-        padding: 4,
-        justifyContent: "center",
-        alignItems: value ? "flex-end" : "flex-start",
-      }}
-    >
-      <View
-        style={[
-          { width: 22, height: 22, borderRadius: 11, backgroundColor: color.surface },
-          shadow.control,
-        ]}
-      />
-    </Pressable>
+      trackColor={{ false: color.disabledBg, true: color.interactive }}
+      thumbColor={Platform.OS === "android" ? color.surface : undefined}
+      ios_backgroundColor={color.disabledBg}
+    />
   );
 }
 

@@ -8,7 +8,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
-import { color, font, radius, space } from "@/theme";
+import { color, font, radius, space, TOUCH_TARGET } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
 import { Txt } from "./Txt";
 
@@ -25,6 +25,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.md,
     paddingHorizontal: space.lg,
+    // Vertical padding plus minHeight (not height) so the field grows with the
+    // system text size instead of clipping its own value.
+    paddingVertical: space.sm,
     // Constant, so focus never reflows the form.
     borderWidth: 1,
   },
@@ -47,7 +50,8 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   searchBox: {
-    height: 46,
+    minHeight: TOUCH_TARGET,
+    paddingVertical: space.sm,
     backgroundColor: color.surface,
     borderWidth: 1,
     borderColor: color.borderSoft,
@@ -131,7 +135,7 @@ export function TextField({
       <View
         style={[
           styles.fieldBox,
-          { height },
+          { minHeight: height },
           { borderColor: invalid ? color.error : focused ? color.primary : color.border },
         ]}
       >

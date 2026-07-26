@@ -10,7 +10,7 @@ export default function WelcomeScreen() {
 
   return (
     <Screen gradient>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 26, paddingTop: space.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.gutter, paddingTop: space.md }}>
         <Image
           accessibilityIgnoresInvertColors
           source={require("../assets/logo-mark.png")}
@@ -22,9 +22,17 @@ export default function WelcomeScreen() {
         </Txt>
       </View>
 
-      {/* Oversized ghosted verbs — decorative, so hidden from screen readers. */}
+      {/*
+        Oversized ghosted verbs — decorative, so hidden from screen readers.
+
+        Deliberate exception to the nine-size ramp: at 13% opacity these read as
+        background texture, not type, and the ramp's Display (40) is already spent
+        on the headline below — which the system allows only one of per screen.
+        Sizing them 40 would put two Displays on one screen and flatten the
+        depth this composition is built on.
+      */}
       <View style={{ flex: 1, overflow: "hidden" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <View style={{ position: "absolute", top: 28, left: 26 }}>
+        <View style={{ position: "absolute", top: 28, left: space.gutter }}>
           {MARQUEE.map((word) => (
             <Txt key={word} size={58} weight={800} color="rgba(255,255,255,0.13)" leading={1} tracking={-0.01}>
               {word}
@@ -33,7 +41,7 @@ export default function WelcomeScreen() {
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: 26, paddingBottom: 30, gap: space.xl }}>
+      <View style={{ paddingHorizontal: space.gutter, paddingBottom: 30, gap: space.xl }}>
         <View>
           <Txt size={40} weight={800} color={color.onDark} tracking={-0.02} leading={1.05}>
             {"One region.\nOne payment."}

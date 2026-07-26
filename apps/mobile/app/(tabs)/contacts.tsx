@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { CURRENCY_SYMBOLS, type Contact } from "@caribpay/shared";
-import { color, radius, shadow, space } from "@/theme";
+import { AVATAR_SIZE, color, radius, shadow, space, TOUCH_TARGET } from "@/theme";
 import { Icon } from "@/components/Icon";
 import {
   Avatar,
@@ -10,6 +10,7 @@ import {
   EmptyState,
   ErrorState,
   IconButton,
+  groupedRowStyle,
   ListRow,
   Screen,
   SearchField,
@@ -18,6 +19,13 @@ import {
 } from "@/components/ui";
 import { useContacts } from "@/api/hooks";
 import { useDraftStore } from "@/stores/draft";
+
+/**
+ * The most a "Quick send" row can hold and still be quick. Past this the row is
+ * just a second contacts list you have to scroll — and it would be the one
+ * unbounded non-virtualized render left in the app.
+ */
+const QUICK_SEND_LIMIT = 8;
 
 /** Pinned contacts as tappable avatars — two taps to pay someone. */
 function QuickSend({ contacts }: { contacts: Contact[] }) {
@@ -48,7 +56,7 @@ function QuickSend({ contacts }: { contacts: Contact[] }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: 10, paddingBottom: 14, gap: 14 }}
       >
-        {contacts.map((contact) => (
+        {contacts.slice(0, QUICK_SEND_LIMIT).map((contact) => (
           <Pressable
             key={contact.id}
             accessibilityRole="button"
@@ -187,8 +195,11 @@ export default function ContactsScreen() {
           onAction={() => router.push("/contact/add")}
         />
       ) : (
-        <ScrollView
+        <FlatList
+          data={filtered}
+          keyExtractor={(contact) => contact.id}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingBottom: space.xxl }}
           refreshControl={
             <RefreshControl
@@ -197,69 +208,78 @@ export default function ContactsScreen() {
               tintColor={color.interactive}
             />
           }
-        >
-          <View style={{ paddingHorizontal: space.gutter, paddingBottom: space.md }}>
-            <SearchField
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search name or address"
-            />
-          </View>
-
-          {pinned.length > 0 && <QuickSend contacts={pinned} />}
-
-          <View style={{ paddingHorizontal: space.gutter }}>
-            <Txt size={13} weight={700} color={color.inkMuted} style={{ paddingTop: 4, paddingBottom: space.sm }}>
-              All contacts
-            </Txt>
-            {filtered.length === 0 ? (
+          ListHeaderComponent={
+            <>
+              <View style={{ paddingHorizontal: space.gutter, paddingBottom: space.md }}>
+                <SearchField
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search name or address"
+                />
+              </View>
+              {pinned.length > 0 && <QuickSend contacts={pinned} />}
+              <Txt
+                size={13}
+                weight={700}
+                color={color.inkMuted}
+                style={{ paddingHorizontal: space.gutter, paddingTop: 4, paddingBottom: space.sm }}
+              >
+                All contacts
+              </Txt>
+            </>
+          }
+          ListEmptyComponent={
+            <View style={{ paddingHorizontal: space.gutter }}>
               <Card style={{ padding: space.xl }}>
                 <Txt size={13} weight={500} color={color.inkMuted} align="center">
                   No contact matches “{search.trim()}”.
                 </Txt>
               </Card>
-            ) : (
-              <Card padded={false} style={{ paddingHorizontal: 14 }}>
-                {filtered.map((contact, i) => (
-                  <ListRow
-                    key={contact.id}
-                    divider={i < filtered.length - 1}
-                    leading={
-                      <Avatar
-                        name={contact.displayName}
-                        size={44}
-                        country={contact.countryCode}
-                        currency={contact.currency}
-                      />
-                    }
-                    title={contact.displayName}
-                    subtitle={`${contact.walletAddress} · ${CURRENCY_SYMBOLS[contact.currency]}`}
-                    trailing={
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Send to ${contact.displayName}`}
-                        onPress={() => send(contact)}
-                        style={[
-                          {
-                            width: 44,
-                            height: 44,
-                            borderRadius: radius.chip,
-                            backgroundColor: color.primarySoft,
-                            alignItems: "center",
-                            justifyContent: "center",
-                          },
-                          shadow.card,
-                        ]}
-                      >
-                        <Icon name="send" size={17} color={color.link} strokeWidth={2.2} />
-                      </Pressable>
-                    }
+            </View>
+          }
+          renderItem={({ item: contact, index }) => (
+            <View
+              style={[
+                groupedRowStyle(index, filtered.length),
+                { marginHorizontal: space.gutter },
+              ]}
+            >
+              <ListRow
+                divider={index < filtered.length - 1}
+                leading={
+                  <Avatar
+                    name={contact.displayName}
+                    size={AVATAR_SIZE}
+                    country={contact.countryCode}
+                    currency={contact.currency}
                   />
-                ))}
-              </Card>
-            )}
-          </View>
-        </ScrollView>
+                }
+                title={contact.displayName}
+                subtitle={`${contact.walletAddress} · ${CURRENCY_SYMBOLS[contact.currency]}`}
+                trailing={
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Send to ${contact.displayName}`}
+                    onPress={() => send(contact)}
+                    style={[
+                      {
+                        width: TOUCH_TARGET,
+                        height: TOUCH_TARGET,
+                        borderRadius: radius.chip,
+                        backgroundColor: color.primarySoft,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      },
+                      shadow.card,
+                    ]}
+                  >
+                    <Icon name="send" size={17} color={color.link} strokeWidth={2.2} />
+                  </Pressable>
+                }
+              />
+            </View>
+          )}
+        />
       )}
     </Screen>
   );

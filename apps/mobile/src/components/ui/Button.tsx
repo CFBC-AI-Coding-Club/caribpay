@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
-import { color, radius, shadow, space } from "@/theme";
+import { color, radius, shadow, space, TOUCH_TARGET } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
 import { Txt } from "./Txt";
 
@@ -102,7 +102,10 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         {
-          height,
+          // minHeight, not height: at large system text sizes the label must be
+          // able to grow the button rather than clip inside it.
+          minHeight: height,
+          paddingVertical: space.sm,
           borderRadius: radius.card,
           backgroundColor: pressed && !inert ? skin.pressedBg : bg,
           flexDirection: "row",
@@ -141,7 +144,7 @@ export function IconButton({
   color: fg = color.ink,
   background = color.surface,
   accessibilityLabel,
-  size = 44,
+  size = TOUCH_TARGET,
   strokeWidth = 2.2,
   elevated = true,
   badge = false,

@@ -4,9 +4,9 @@ import { useRouter } from "expo-router";
 import {
   COUNTRY_NAMES,
   CURRENCY_SYMBOLS,
-  FLAG_COUNTRIES,
+  SUPPORTED_COUNTRIES,
   homeCurrencyFor,
-  type FlagCountry,
+  type SupportedCountry,
 } from "@caribpay/shared";
 import { color, space } from "@/theme";
 import { Flag } from "@/components/Flag";
@@ -22,7 +22,7 @@ import {
 import { useRegister } from "@/api/hooks";
 import { ApiRequestError } from "@/api/client";
 
-const COUNTRY_OPTIONS = FLAG_COUNTRIES.map((code) => ({
+const COUNTRY_OPTIONS = SUPPORTED_COUNTRIES.map((code) => ({
   value: code,
   label: COUNTRY_NAMES[code] ?? code,
   detail: `${CURRENCY_SYMBOLS[homeCurrencyFor(code)]} · ${homeCurrencyFor(code)}`,
@@ -36,7 +36,7 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [country, setCountry] = useState<FlagCountry>("KN");
+  const [country, setCountry] = useState<SupportedCountry>("KN");
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const homeCurrency = homeCurrencyFor(country);
@@ -60,7 +60,7 @@ export default function RegisterScreen() {
   return (
     <SheetScreen
       header={
-        <View style={{ paddingHorizontal: 26, paddingTop: 6 }}>
+        <View style={{ paddingHorizontal: space.gutter, paddingTop: 6 }}>
           <Image
             accessibilityIgnoresInvertColors
             source={require("../assets/logo-mark.png")}
@@ -81,7 +81,7 @@ export default function RegisterScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={{ padding: space.xxl, paddingTop: 26, gap: space.md }}
+          contentContainerStyle={{ padding: space.gutter, paddingTop: 26, gap: space.md }}
           keyboardShouldPersistTaps="handled"
         >
           {register.isError && (

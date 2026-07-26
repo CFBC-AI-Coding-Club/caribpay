@@ -3,6 +3,7 @@
  * This is the only place raw hex/px values live — screens and components read
  * from here so a palette change lands everywhere at once.
  */
+import { Platform } from "react-native";
 
 export const color = {
   /** Screen background. */
@@ -59,6 +60,10 @@ export const color = {
   spinnerTrack: "#DAD5FB",
   /** Error text that has to stay legible on the deep/scan backgrounds. */
   errorOnDark: "#FFC2C2",
+
+  /** Ripple wash behind the transfer status mark — `success` and `interactive` at 16%. */
+  rippleSettled: "rgba(14,106,76,0.16)",
+  ripplePending: "rgba(85,96,232,0.16)",
 
   // Borders & hairlines
   border: "rgba(26,19,64,0.10)",
@@ -136,9 +141,19 @@ export const radius = {
   pill: 999,
 } as const;
 
-/** Minimum touch target, 44×44pt, 8pt apart. */
+/**
+ * Minimum touch target. Apple's floor is 44pt; Material's is 48dp — so this is
+ * platform-aware rather than a single number, and Android is not shipped a
+ * target that is legal on iOS but undersized on the hardware most of our users
+ * actually hold.
+ */
+export const TOUCH_TARGET = Platform.select({ ios: 44, default: 48 });
+
+/** Targets sit at least 8pt apart; hit slop makes up the difference for small glyphs. */
 export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
-export const TOUCH_TARGET = 44;
+
+/** Avatar/flag diameter in a list row. A visual dimension, not a touch target. */
+export const AVATAR_SIZE = 44;
 
 /**
  * Shadows. RN needs iOS (shadow*) and Android (elevation) spelled separately;

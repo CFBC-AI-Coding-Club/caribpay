@@ -14,12 +14,16 @@ import {
   Txt,
 } from "@/components/ui";
 import { useResolveQr } from "@/api/hooks";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import { useDraftStore } from "@/stores/draft";
 
 /** Sweeping line inside the reticle while the camera is live. */
 function ScanLine() {
   const y = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
+    if (reducedMotion) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(y, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -28,7 +32,12 @@ function ScanLine() {
     );
     loop.start();
     return () => loop.stop();
-  }, [y]);
+  }, [y, reducedMotion]);
+
+  // Reduce Motion: a full-screen repeating sweep is exactly the kind of motion
+  // this setting exists to stop. The reticle brackets and the instruction copy
+  // already communicate "point the camera here".
+  if (reducedMotion) return null;
 
   return (
     <Animated.View
@@ -225,7 +234,7 @@ export default function ScanScreen() {
         </View>
 
         {failed ? (
-          <View style={{ width: "100%", paddingHorizontal: space.xxl, marginTop: space.xl }}>
+          <View style={{ width: "100%", paddingHorizontal: space.gutter, marginTop: space.xl }}>
             <View
               style={{
                 backgroundColor: "rgba(198,58,58,0.16)",
@@ -259,7 +268,7 @@ export default function ScanScreen() {
         )}
       </View>
 
-      <View style={{ paddingHorizontal: space.xxl, paddingBottom: space.sm, gap: 10 }}>
+      <View style={{ paddingHorizontal: space.gutter, paddingBottom: space.sm, gap: 10 }}>
         {failed && <Button label="Scan again" variant="onDarkPrimary" onPress={scanAgain} />}
         <Button
           label="Enter address manually"

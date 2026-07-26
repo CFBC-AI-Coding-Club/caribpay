@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Share, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, ScrollView, Share, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { formatAmount, formatRate, type Transaction } from "@caribpay/shared";
 import { color, space } from "@/theme";
@@ -18,14 +18,17 @@ import {
 } from "@/components/ui";
 import { useTransfer } from "@/api/hooks";
 import { timeWithSeconds } from "@/lib/datetime";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 
 /** Concentric circles expanding outward — the "in flight" and "done" flourish. */
 function Ripple({ tint, count = 2 }: { tint: string; count?: number }) {
   const waves = useRef(
     Array.from({ length: count }, () => new Animated.Value(0)),
   ).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) return;
     const animations = waves.map((wave, i) =>
       Animated.loop(
         Animated.sequence([
@@ -41,7 +44,11 @@ function Ripple({ tint, count = 2 }: { tint: string; count?: number }) {
     );
     animations.forEach((a) => a.start());
     return () => animations.forEach((a) => a.stop());
-  }, [waves]);
+  }, [waves, reducedMotion]);
+
+  // Reduce Motion: drop the expanding waves entirely. They are pure atmosphere —
+  // the status mark, headline, and timeline all still say what is happening.
+  if (reducedMotion) return null;
 
   return (
     <>
@@ -67,16 +74,48 @@ function Ripple({ tint, count = 2 }: { tint: string; count?: number }) {
 
 /** The settled checkmark pops in once. */
 function Pop({ children }: { children: React.ReactNode }) {
-  const scale = useRef(new Animated.Value(0.82)).current;
+  const reducedMotion = useReducedMotion();
+  const scale = useRef(new Animated.Value(reducedMotion ? 1 : 0.82)).current;
+
   useEffect(() => {
+    if (reducedMotion) {
+      scale.setValue(1);
+      return;
+    }
     Animated.timing(scale, {
       toValue: 1,
       duration: 500,
       easing: Easing.out(Easing.back(2)),
       useNativeDriver: true,
     }).start();
-  }, [scale]);
+  }, [scale, reducedMotion]);
+
   return <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>;
+}
+
+/**
+ * Speak the terminal outcome once, when it happens. Announcing the pending
+ * state too would talk over the user while they are still reading the screen —
+ * only the resolution is worth interrupting for.
+ */
+function useSettlementAnnouncement(
+  status: Transaction["status"],
+  recipientName: string,
+  received: string,
+): void {
+  const announced = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (status !== "settled" && status !== "failed") return;
+    if (announced.current === status) return;
+    announced.current = status;
+
+    AccessibilityInfo.announceForAccessibility(
+      status === "settled"
+        ? `Sent. ${received} delivered to ${recipientName}.`
+        : "Transfer failed. No money left your wallet.",
+    );
+  }, [status, recipientName, received]);
 }
 
 function statusSteps(tx: Transaction): Step[] {
@@ -138,6 +177,11 @@ export default function TransferStatusScreen() {
   const settled = tx.status === "settled";
   const failed = tx.status === "failed";
 
+  // This screen changes under the user while they watch it. Sighted users get
+  // the mark, the headline, and the timeline; without an explicit announcement a
+  // screen-reader user gets nothing at all for the one event they care about.
+  useSettlementAnnouncement(tx.status, recipientName, received);
+
   async function shareReceipt() {
     const lines = [
       `CaribPay transfer${settled ? " — sent" : ""}`,
@@ -157,7 +201,21 @@ export default function TransferStatusScreen() {
     <Screen edges={{ bottom: false }}>
       <ScreenHeader title="Transfer" onBack={false} />
 
-      <View style={{ flex: 1, alignItems: "center", paddingHorizontal: 30, paddingTop: 18 }}>
+      {/*
+        Scrolls rather than clips: the failure state adds a notice above the
+        timeline and two buttons below it, which overflows a small phone once the
+        system text size goes up. The flex spacer below still pins the actions to
+        the foot whenever the content does fit.
+      */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: "center",
+          paddingHorizontal: space.gutter,
+          paddingTop: 18,
+        }}
+      >
         {/* Status mark */}
         <View
           style={{
@@ -168,7 +226,12 @@ export default function TransferStatusScreen() {
             marginTop: 10,
           }}
         >
-          {!failed && <Ripple tint={settled ? "rgba(18,128,92,0.16)" : "rgba(85,96,232,0.16)"} count={settled ? 1 : 2} />}
+          {!failed && (
+            <Ripple
+              tint={settled ? color.rippleSettled : color.ripplePending}
+              count={settled ? 1 : 2}
+            />
+          )}
           {failed ? (
             <View
               style={{
@@ -224,7 +287,11 @@ export default function TransferStatusScreen() {
           )}
         </View>
 
-        <View style={{ alignItems: "center", marginTop: space.xl }}>
+        <View
+          style={{ alignItems: "center", marginTop: space.xl }}
+          accessibilityLiveRegion="polite"
+          accessible
+        >
           <Txt size={24} weight={800} align="center">
             {failed ? "Transfer failed" : settled ? "Sent!" : `Sending to ${firstName}…`}
           </Txt>
@@ -304,7 +371,7 @@ export default function TransferStatusScreen() {
             </>
           )}
         </View>
-      </View>
+      </ScrollView>
       <HomeIndicator />
     </Screen>
   );

@@ -7,13 +7,34 @@
     "scheme": "caribpay",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/logo-mark.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#181136"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.caribpay.app"
     },
     "android": {
-      "package": "com.caribpay.app"
+      "package": "com.caribpay.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo-mark.png",
+        "backgroundColor": "#181136"
+      },
+      "softwareKeyboardLayoutMode": "resize"
     },
-    "plugins": ["expo-router", "expo-secure-store"]
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CaribPay uses the camera to scan a CaribPay QR code so you can pay someone without typing their wallet address.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ]
   }
 }

@@ -46,7 +46,14 @@ function RootNavigator({ ready }: { ready: boolean }) {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="send/index" />
       <Stack.Screen name="send/review" />
-      <Stack.Screen name="transfer/[id]" options={{ gestureEnabled: false }} />
+      {/*
+        The back gesture stays enabled here. Settlement continues server-side
+        whatever the user does, and the feed shows the same state — so trapping
+        them on this screen buys nothing and breaks the most reflexive gesture
+        on both platforms (HIG: never disable edge-swipe back; Material: never
+        hijack predictive Back).
+      */}
+      <Stack.Screen name="transfer/[id]" />
       <Stack.Screen name="transaction/[id]" />
       <Stack.Screen name="wallet/[id]" />
       <Stack.Screen name="wallet/add" />

@@ -1,4 +1,4 @@
-import { ScrollView, View } from "react-native";
+import { FlatList, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   COUNTRY_NAMES,
@@ -9,14 +9,14 @@ import {
   homeCurrencyFor,
   splitAmount,
 } from "@caribpay/shared";
-import { color, space } from "@/theme";
+import { color, space, TOUCH_TARGET } from "@/theme";
 import { Flag } from "@/components/Flag";
 import {
   Button,
-  Card,
   EmptyState,
   ErrorState,
   GradientCard,
+  groupedRowStyle,
   HomeIndicator,
   Loading,
   Screen,
@@ -143,30 +143,34 @@ export default function WalletDetailScreen() {
             onAction={() => router.push(`/receive?currency=${wallet.currency}`)}
           />
         ) : (
-          <ScrollView contentContainerStyle={{ paddingBottom: space.lg }}>
-            <Card padded={false} style={{ paddingHorizontal: 14 }}>
-              {transactions.map((tx, i) => (
+          <FlatList
+            data={transactions}
+            keyExtractor={(tx) => tx.id}
+            contentContainerStyle={{ paddingBottom: space.lg }}
+            renderItem={({ item, index }) => (
+              <View style={groupedRowStyle(index, transactions.length)}>
                 <TransactionRow
-                  key={tx.id}
-                  transaction={tx}
+                  transaction={item}
                   walletCurrency={wallet.currency}
-                  divider={i < transactions.length - 1}
-                />
-              ))}
-            </Card>
-            {feed.hasNextPage && (
-              <View style={{ alignItems: "center", paddingTop: space.md }}>
-                <Button
-                  label="Load more"
-                  variant="ghost"
-                  height={44}
-                  loading={feed.isFetchingNextPage}
-                  onPress={() => void feed.fetchNextPage()}
-                  style={{ backgroundColor: color.primarySoft }}
+                  divider={index < transactions.length - 1}
                 />
               </View>
             )}
-          </ScrollView>
+            ListFooterComponent={
+              feed.hasNextPage ? (
+                <View style={{ alignItems: "center", paddingTop: space.md }}>
+                  <Button
+                    label="Load more"
+                    variant="ghost"
+                    height={TOUCH_TARGET}
+                    loading={feed.isFetchingNextPage}
+                    onPress={() => void feed.fetchNextPage()}
+                    style={{ backgroundColor: color.primarySoft }}
+                  />
+                </View>
+              ) : null
+            }
+          />
         )}
       </View>
       <HomeIndicator />

@@ -22,7 +22,7 @@ export default function LoginScreen() {
   return (
     <SheetScreen
       header={
-        <View style={{ paddingHorizontal: 26, paddingTop: 6 }}>
+        <View style={{ paddingHorizontal: space.gutter, paddingTop: 6 }}>
           <Image
             accessibilityIgnoresInvertColors
             source={require("../assets/logo-mark.png")}
@@ -43,7 +43,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={{ padding: space.xxl, paddingTop: 30, gap: space.lg }}
+          contentContainerStyle={{ padding: space.gutter, paddingTop: 30, gap: space.lg }}
           keyboardShouldPersistTaps="handled"
         >
           {login.isError && (

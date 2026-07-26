@@ -1,13 +1,17 @@
 /**
- * Circular country flags for the six markets CaribPay covers, transcribed from
- * the design board's `Flag` component. Each is drawn on a 48×48 grid and
- * clipped to a circle with a 1px inset ring so light flags (US, VC) still read
- * as a disc on a white card.
+ * Circular country flags, transcribed from the design board's `Flag` component.
+ * Each is drawn on a 48×48 grid and clipped to a circle with a 1px inset ring so
+ * light flags (US, VC) still read as a disc on a white card.
+ *
+ * Six supported XCD territories are not drawn yet (AG, AI, DM, GD, LC, MS); they
+ * render a lettered disc instead — see `CODE_DISC_MIN_SIZE` below.
  */
 import { View } from "react-native";
 import Svg, { Circle, G, Path, Polygon, Rect } from "react-native-svg";
 import type { Currency, FlagCountry } from "@caribpay/shared";
-import { flagCountryFor } from "@caribpay/shared";
+import { FLAG_COUNTRIES, flagCountryFor } from "@caribpay/shared";
+import { color } from "@/theme";
+import { Txt } from "@/components/ui/Txt";
 
 const FLAGS: Record<FlagCountry, React.ReactNode> = {
   KN: (
@@ -107,7 +111,41 @@ export interface FlagProps {
   size?: number;
 }
 
+/** Smallest disc whose two-letter code still clears the 11px type floor. */
+const CODE_DISC_MIN_SIZE = 30;
+
 export function Flag({ country, currency = "XCD", size = 24 }: FlagProps) {
+  const requested = (country ?? "").toUpperCase();
+  const undrawn =
+    requested !== "" && !(FLAG_COUNTRIES as readonly string[]).includes(requested);
+
+  // A country we support but have not drawn yet gets its own lettered disc.
+  // Showing Dominica a neighbour's flag is worse than showing no flag at all.
+  //
+  // Below 30px two letters cannot reach the 11px floor, so small chips keep the
+  // zone flag instead. Those chips always sit beside the currency symbol, which
+  // already names the zone — a blank disc there would say less, not more.
+  if (undrawn && size >= CODE_DISC_MIN_SIZE) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color.primarySoft,
+          borderWidth: 1,
+          borderColor: color.borderStrong,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Txt size={Math.round(size * 0.38)} weight={700} color={color.link}>
+          {requested}
+        </Txt>
+      </View>
+    );
+  }
+
   const code = flagCountryFor(country, currency);
   return (
     <View
@@ -121,7 +159,7 @@ export function Flag({ country, currency = "XCD", size = 24 }: FlagProps) {
       <Svg width={size} height={size} viewBox="0 0 48 48">
         {FLAGS[code]}
         {/* Inset hairline so pale flags keep a visible edge on white. */}
-        <Circle cx={24} cy={24} r={23.5} fill="none" stroke="rgba(14,27,46,0.14)" strokeWidth={1} />
+        <Circle cx={24} cy={24} r={23.5} fill="none" stroke={color.borderStrong} strokeWidth={1} />
       </Svg>
     </View>
   );

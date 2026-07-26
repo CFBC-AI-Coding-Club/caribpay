@@ -40,7 +40,7 @@ const QUICK_ACTIONS: { icon: IconName; label: string; href: string }[] = [
 function QuickActions() {
   const router = useRouter();
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 30, paddingTop: space.xl, paddingBottom: space.sm }}>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space.gutter, paddingTop: space.xl, paddingBottom: space.sm }}>
       {QUICK_ACTIONS.map((action) => (
         <Pressable
           key={action.label}

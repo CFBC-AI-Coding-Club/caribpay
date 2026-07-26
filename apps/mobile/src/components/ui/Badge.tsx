@@ -51,7 +51,10 @@ export function Pill({
     >
       {icon !== undefined && <Icon name={icon} size={size} color={fg} strokeWidth={3} />}
       {label !== undefined && (
-        <Txt size={size} weight={700} color={fg}>
+        // Tabular unconditionally: pills carry the quote countdown, which is the
+        // fastest-changing number in the app, and proportional digits made it
+        // twitch once a second. It is a no-op on the lettered pills.
+        <Txt size={size} weight={700} color={fg} tabular>
           {label}
         </Txt>
       )}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, View } from "react-native";
 import { color, space } from "@/theme";
 import { Icon } from "@/components/Icon";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import { Txt } from "./Txt";
 
 export type StepState = "done" | "active" | "upcoming" | "failed";
@@ -16,7 +17,10 @@ export interface Step {
 /** Indeterminate ring for the in-flight step. */
 function Spinner({ size = 28 }: { size?: number }) {
   const spin = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
+    if (reducedMotion) return;
     const loop = Animated.loop(
       Animated.timing(spin, {
         toValue: 1,
@@ -27,8 +31,10 @@ function Spinner({ size = 28 }: { size?: number }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [spin]);
+  }, [spin, reducedMotion]);
 
+  // Reduce Motion: a static two-tone ring. The step's label already says
+  // "Pending settlement", so nothing is communicated by the rotation alone.
   return (
     <Animated.View
       style={{
@@ -38,7 +44,9 @@ function Spinner({ size = 28 }: { size?: number }) {
         borderWidth: 3,
         borderColor: color.spinnerTrack,
         borderTopColor: color.link,
-        transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }],
+        transform: reducedMotion
+          ? []
+          : [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }],
       }}
     />
   );

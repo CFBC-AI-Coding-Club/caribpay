@@ -56,6 +56,22 @@ export function PickerSheet<T extends string>({
             maxHeight: "80%",
           }}
         >
+          {/*
+            Grabber. Both platforms use it to say "this sheet is dismissible";
+            without it the only visible exit is the close button. (True
+            swipe-to-dismiss needs a gesture library this project deliberately
+            does not carry — tap-scrim and system Back both dismiss.)
+          */}
+          <View
+            style={{
+              alignSelf: "center",
+              width: 36,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: color.borderStrong,
+              marginBottom: space.md,
+            }}
+          />
           <View
             style={{
               flexDirection: "row",

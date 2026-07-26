@@ -18,8 +18,41 @@ import {
 } from "@/components/ui";
 import { useCreateTransfer, useFxQuote } from "@/api/hooks";
 import { useDraftStore } from "@/stores/draft";
-import { ApiRequestError } from "@/api/client";
+import { ApiRequestError, ApiUnreachableError } from "@/api/client";
 import { countdownLabel, secondsUntil } from "@/lib/datetime";
+
+/**
+ * Two different truths, and blurring them is the worst thing this screen can do.
+ * A request the server rejected never posted, so saying so is honest. A request
+ * we never heard back from may well have posted — the transfer could be settling
+ * right now — so the only honest thing is to say we do not know and point at the
+ * place that does. Retrying is safe either way: the draft's idempotency key makes
+ * a second attempt replay the first rather than send twice.
+ */
+function SendError({ error }: { error: unknown }) {
+  if (error instanceof ApiRequestError && error.status < 500) {
+    return (
+      <Notice
+        tone="error"
+        title="Could not send this transfer"
+        body={error.message}
+        reference={error.code}
+      />
+    );
+  }
+
+  const lead =
+    error instanceof ApiUnreachableError && error.timedOut
+      ? "The connection timed out before we heard back."
+      : "We didn't hear back from CaribPay.";
+  return (
+    <Notice
+      tone="pending"
+      title="We couldn't confirm this transfer"
+      body={`${lead} We don't know yet whether it went through — check your Transfers list first, and it will be there if it did.`}
+    />
+  );
+}
 
 function DetailRow({
   label,
@@ -107,6 +140,13 @@ export default function SendReviewScreen() {
     !createTransfer.isPending &&
     (!crossCurrency || (effectiveQuote !== undefined && effectiveQuote !== null));
 
+  // The quote id travels in the request body, so confirming a re-priced quote is
+  // a different transfer and must not replay the earlier attempt's response.
+  const idempotencyKey =
+    effectiveQuote == null
+      ? draft.idempotencyKey
+      : `${draft.idempotencyKey}-${effectiveQuote.id}`;
+
   // An arrow const, not a hoisted `function`, so the null-guard above narrows here.
   const send = () => {
     if (!canSend) return;
@@ -118,10 +158,15 @@ export default function SendReviewScreen() {
         sourceAmountMinor,
         note: draft.note.trim() === "" ? undefined : draft.note.trim(),
         quoteId: crossCurrency ? (effectiveQuote?.id ?? undefined) : undefined,
+        idempotencyKey,
       },
       {
         onSuccess: (tx) => {
           reset();
+          // Collapse the send flow before showing status, so the now-enabled
+          // back gesture returns to the tab root rather than to a compose
+          // screen whose draft we just cleared.
+          if (router.canDismiss()) router.dismissAll();
           router.replace(`/transfer/${tx.id}`);
         },
       },
@@ -132,7 +177,10 @@ export default function SendReviewScreen() {
     <Screen edges={{ bottom: false }}>
       <ScreenHeader title="Review transfer" />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.sm }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.sm }}
+      >
         {needsReconfirm && effectiveQuote != null && reviewedQuote !== null && (
           <Notice
             tone="pending"
@@ -143,20 +191,7 @@ export default function SendReviewScreen() {
 
         {createTransfer.isError && (
           <View style={{ paddingTop: needsReconfirm ? space.md : 0 }}>
-            <Notice
-              tone="error"
-              title="Could not send this transfer"
-              body={
-                createTransfer.error instanceof ApiRequestError
-                  ? createTransfer.error.message
-                  : "Something went wrong. Nothing has left your wallet."
-              }
-              reference={
-                createTransfer.error instanceof ApiRequestError
-                  ? createTransfer.error.code
-                  : undefined
-              }
-            />
+            <SendError error={createTransfer.error} />
           </View>
         )}
 
@@ -283,25 +318,31 @@ export default function SendReviewScreen() {
           </View>
         )}
 
-        <View style={{ gap: 10, paddingTop: space.xl }}>
-          <Button
-            label={needsReconfirm ? "Confirm at new rate" : "Confirm & send"}
-            icon={needsReconfirm ? undefined : "checkWide"}
-            loading={createTransfer.isPending}
-            disabled={!canSend}
-            onPress={send}
-          />
-          <Button
-            label={needsReconfirm ? "Change amount" : "Back"}
-            variant="secondary"
-            height={needsReconfirm ? 52 : 48}
-            onPress={() => {
-              setQuote(null);
-              router.back();
-            }}
-          />
-        </View>
       </ScrollView>
+
+      {/*
+        Pinned action zone. Keeping it out of the scroll view means the rate-moved
+        notice and its three extra rows no longer push "Confirm & send" downward
+        while the thumb is already travelling toward it.
+      */}
+      <View style={{ gap: 10, paddingHorizontal: space.gutter, paddingTop: space.md }}>
+        <Button
+          label={needsReconfirm ? "Confirm at new rate" : "Confirm & send"}
+          icon={needsReconfirm ? undefined : "checkWide"}
+          loading={createTransfer.isPending}
+          disabled={!canSend}
+          onPress={send}
+        />
+        <Button
+          label={needsReconfirm ? "Change amount" : "Back"}
+          variant="secondary"
+          height={needsReconfirm ? 52 : 48}
+          onPress={() => {
+            setQuote(null);
+            router.back();
+          }}
+        />
+      </View>
       <HomeIndicator />
     </Screen>
   );

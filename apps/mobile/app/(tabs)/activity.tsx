@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
-import { RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, SectionList, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { Transaction } from "@caribpay/shared";
-import { color, radius, space } from "@/theme";
+import { color, radius, space, TOUCH_TARGET } from "@/theme";
 import {
   Button,
-  Card,
   EmptyState,
   ErrorState,
   FilterChips,
+  groupedRowStyle,
   Screen,
   SectionLabel,
   Skeleton,
@@ -40,14 +40,14 @@ function matches(tx: Transaction, filter: Filter): boolean {
   }
 }
 
-/** Group consecutive rows under Today / Yesterday / month headings. */
-function groupByDay(items: Transaction[]): { label: string; items: Transaction[] }[] {
-  const groups: { label: string; items: Transaction[] }[] = [];
+/** Group consecutive rows under Today / Yesterday / month headings, in SectionList shape. */
+function groupByDay(items: Transaction[]): { label: string; data: Transaction[] }[] {
+  const groups: { label: string; data: Transaction[] }[] = [];
   for (const tx of items) {
     const label = dayGroupLabel(tx.createdAt);
     const last = groups[groups.length - 1];
-    if (last !== undefined && last.label === label) last.items.push(tx);
-    else groups.push({ label, items: [tx] });
+    if (last !== undefined && last.label === label) last.data.push(tx);
+    else groups.push({ label, data: [tx] });
   }
   return groups;
 }
@@ -111,7 +111,10 @@ export default function ActivityScreen() {
           onAction={() => setFilter("all")}
         />
       ) : (
-        <ScrollView
+        <SectionList
+          sections={groups}
+          keyExtractor={(tx) => tx.id}
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={{ paddingHorizontal: space.gutter, paddingBottom: space.xxl }}
           refreshControl={
             <RefreshControl
@@ -120,37 +123,31 @@ export default function ActivityScreen() {
               tintColor={color.interactive}
             />
           }
-        >
-          {groups.map((group) => (
-            <View key={group.label}>
-              <SectionLabel style={{ paddingTop: space.md, paddingBottom: space.xs }}>
-                {group.label}
-              </SectionLabel>
-              <Card padded={false} style={{ paddingHorizontal: 14 }}>
-                {group.items.map((tx, i) => (
-                  <TransactionRow
-                    key={tx.id}
-                    transaction={tx}
-                    divider={i < group.items.length - 1}
-                  />
-                ))}
-              </Card>
-            </View>
-          ))}
-
-          {feed.hasNextPage && (
-            <View style={{ alignItems: "center", paddingTop: 14 }}>
-              <Button
-                label="Load more"
-                variant="ghost"
-                height={44}
-                loading={feed.isFetchingNextPage}
-                onPress={() => void feed.fetchNextPage()}
-                style={{ backgroundColor: color.primarySoft }}
-              />
+          renderSectionHeader={({ section }) => (
+            <SectionLabel style={{ paddingTop: space.md, paddingBottom: space.xs }}>
+              {section.label}
+            </SectionLabel>
+          )}
+          renderItem={({ item, index, section }) => (
+            <View style={groupedRowStyle(index, section.data.length)}>
+              <TransactionRow transaction={item} divider={index < section.data.length - 1} />
             </View>
           )}
-        </ScrollView>
+          ListFooterComponent={
+            feed.hasNextPage ? (
+              <View style={{ alignItems: "center", paddingTop: 14 }}>
+                <Button
+                  label="Load more"
+                  variant="ghost"
+                  height={TOUCH_TARGET}
+                  loading={feed.isFetchingNextPage}
+                  onPress={() => void feed.fetchNextPage()}
+                  style={{ backgroundColor: color.primarySoft }}
+                />
+              </View>
+            ) : null
+          }
+        />
       )}
     </Screen>
   );

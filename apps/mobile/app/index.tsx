@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, View } from "react-native";
 import { color, space } from "@/theme";
 import { HomeIndicator, Screen, Txt } from "@/components/ui";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 
 /** Three dots pulsing in sequence while the session is restored. */
 function PulsingDots() {
@@ -11,7 +12,15 @@ function PulsingDots() {
     new Animated.Value(0.45),
   ]).current;
 
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
+    // Reduce Motion: show three steady dots. "Securing your session…" below
+    // them already carries the meaning.
+    if (reducedMotion) {
+      dots.forEach((dot) => dot.setValue(1));
+      return;
+    }
     const animations = dots.map((dot, i) =>
       Animated.loop(
         Animated.sequence([
@@ -34,7 +43,7 @@ function PulsingDots() {
     );
     animations.forEach((a) => a.start());
     return () => animations.forEach((a) => a.stop());
-  }, [dots]);
+  }, [dots, reducedMotion]);
 
   return (
     <View style={{ flexDirection: "row", gap: space.sm }}>

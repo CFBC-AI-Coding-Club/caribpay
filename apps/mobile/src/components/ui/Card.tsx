@@ -125,6 +125,27 @@ export function RowGroup({
   );
 }
 
+/**
+ * Card chrome for a row rendered inside a virtualized list.
+ *
+ * A `Card` cannot wrap a group of rows once the list is virtualized — the rows
+ * are siblings, not children — so each row carries the part of the card it sits
+ * on: the first row rounds the top, the last rounds the bottom, and every row
+ * paints the surface. Visually identical to a wrapping Card.
+ */
+export function groupedRowStyle(index: number, total: number): ViewStyle {
+  const first = index === 0;
+  const last = index === total - 1;
+  return {
+    backgroundColor: color.surface,
+    paddingHorizontal: 14,
+    borderTopLeftRadius: first ? radius.card : 0,
+    borderTopRightRadius: first ? radius.card : 0,
+    borderBottomLeftRadius: last ? radius.card : 0,
+    borderBottomRightRadius: last ? radius.card : 0,
+  };
+}
+
 /** One line of a RowGroup. `last` drops the divider. */
 export function Row({
   children,

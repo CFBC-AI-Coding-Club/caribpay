@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, Pressable, Share, View } from "react-native";
+import { Image, Pressable, ScrollView, Share, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import QRCode from "react-native-qrcode-svg";
@@ -72,7 +72,18 @@ export default function ReceiveScreen() {
       ) : receive.isPending || receive.data === undefined ? (
         <Loading label="Building your code…" />
       ) : (
-        <View style={{ flex: 1, alignItems: "center", paddingHorizontal: space.xxl, paddingTop: 10 }}>
+        // A ScrollView rather than a fixed column: the QR block and the two
+        // actions below it are taller than a small phone at large text sizes, and
+        // an unreachable "Copy address" is the whole point of this screen missed.
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            alignItems: "center",
+            paddingHorizontal: space.gutter,
+            paddingTop: 10,
+          }}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Change which wallet receives"
@@ -211,7 +222,7 @@ export default function ReceiveScreen() {
               onPress={() => void shareAddress()}
             />
           </View>
-        </View>
+        </ScrollView>
       )}
 
       <PickerSheet

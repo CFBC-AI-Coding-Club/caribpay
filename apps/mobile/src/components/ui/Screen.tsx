@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { color, deepGradient, radius, space } from "@/theme";
+import { color, deepGradient, radius, space, useLayout } from "@/theme";
 import { IconButton } from "./Button";
 import { Txt } from "./Txt";
 
@@ -29,8 +29,13 @@ export function Screen({
   edges?: { top?: boolean; bottom?: boolean };
 }) {
   const insets = useSafeAreaInsets();
+  const { gutterInset } = useLayout();
   const pad = {
     paddingTop: edges.top === false ? 0 : insets.top,
+    // Side insets keep content off a landscape notch; on a wide window they also
+    // centre the column instead of stretching it across a tablet.
+    paddingLeft: Math.max(insets.left, gutterInset),
+    paddingRight: Math.max(insets.right, gutterInset),
     paddingBottom: edges.bottom === false ? 0 : insets.bottom,
   };
   const body = <View style={[{ flex: 1 }, pad, style]}>{children}</View>;
@@ -126,6 +131,11 @@ export function SheetScreen({
   contentStyle?: StyleProp<ViewStyle>;
 }) {
   const insets = useSafeAreaInsets();
+  const { gutterInset } = useLayout();
+  const sides = {
+    paddingLeft: Math.max(insets.left, gutterInset),
+    paddingRight: Math.max(insets.right, gutterInset),
+  };
   return (
     <View style={{ flex: 1, backgroundColor: color.bg }}>
       <StatusBar style="light" />
@@ -136,7 +146,7 @@ export function SheetScreen({
         end={deepGradient.end}
         style={{ paddingTop: insets.top, paddingBottom: 54 }}
       >
-        {header}
+        <View style={sides}>{header}</View>
       </LinearGradient>
       <View
         style={[
@@ -147,6 +157,7 @@ export function SheetScreen({
             borderTopRightRadius: radius.sheet,
             marginTop: -32,
           },
+          sides,
           contentStyle,
         ]}
       >

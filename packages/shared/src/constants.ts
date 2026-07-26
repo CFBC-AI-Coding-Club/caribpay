@@ -30,6 +30,28 @@ export const CURRENCY_NAMES: Record<Currency, string> = {
 export const FLAG_COUNTRIES = ["KN", "JM", "BB", "TT", "VC", "US"] as const;
 export type FlagCountry = (typeof FLAG_COUNTRIES)[number];
 
+/**
+ * Countries a user can register from, in picker order (alphabetical by name).
+ * This is deliberately wider than FLAG_COUNTRIES: whether we have drawn a flag
+ * is an asset question, and it must not decide who is allowed an account. Six of
+ * these are XCD territories that render a lettered disc until their flag exists.
+ */
+export const SUPPORTED_COUNTRIES = [
+  "AI",
+  "AG",
+  "BB",
+  "DM",
+  "GD",
+  "JM",
+  "MS",
+  "KN",
+  "LC",
+  "VC",
+  "TT",
+  "US",
+] as const;
+export type SupportedCountry = (typeof SUPPORTED_COUNTRIES)[number];
+
 export const COUNTRY_NAMES: Record<string, string> = {
   AG: "Antigua & Barbuda",
   AI: "Anguilla",

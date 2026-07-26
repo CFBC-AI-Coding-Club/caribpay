@@ -14,6 +14,29 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * The request never produced a response — offline, DNS failure, or our own
+ * timeout. Distinct from ApiRequestError because the outcome is *unknown*: for a
+ * write, the server may well have processed it. Callers must not tell the user
+ * nothing happened.
+ */
+export class ApiUnreachableError extends Error {
+  constructor(
+    message: string,
+    /** True when our own deadline fired rather than the connection failing. */
+    public readonly timedOut: boolean,
+  ) {
+    super(message);
+    this.name = "ApiUnreachableError";
+  }
+}
+
+/**
+ * How long to wait before giving up on a request. Long enough for a slow mobile
+ * connection to finish a transfer, short enough that a spinner is never forever.
+ */
+const REQUEST_TIMEOUT_MS = 20_000;
+
 export interface RequestOptions<T> {
   method?: "GET" | "POST";
   body?: unknown;
@@ -68,11 +91,27 @@ async function rawRequest(path: string, options: RequestOptions<unknown>): Promi
   if (options.idempotencyKey !== undefined) {
     headers["Idempotency-Key"] = options.idempotencyKey;
   }
-  return await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+
+  // Every request carries a deadline. Without one a stalled connection leaves the
+  // caller's spinner running with no way out — worst of all on Confirm & send.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const timedOut = controller.signal.aborted;
+    throw new ApiUnreachableError(
+      timedOut ? "The request timed out" : "Could not reach CaribPay",
+      timedOut,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {

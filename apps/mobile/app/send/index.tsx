@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   CURRENCY_NAMES,
@@ -11,7 +11,7 @@ import {
   toMinor,
   type Currency,
 } from "@caribpay/shared";
-import { color, radius, shadow, space } from "@/theme";
+import { AVATAR_SIZE, color, radius, shadow, space } from "@/theme";
 import { Icon } from "@/components/Icon";
 import { Flag } from "@/components/Flag";
 import {
@@ -202,7 +202,12 @@ export default function SendComposeScreen() {
           )}
         </>
       ) : (
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: space.sm }}>
+        <>
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: space.sm }}
+        >
           {/* Recipient */}
           <Card style={{ marginHorizontal: space.gutter, marginTop: space.md, paddingHorizontal: 12 }}>
             <ListRow
@@ -391,9 +396,16 @@ export default function SendComposeScreen() {
             </View>
           )}
 
-          <View style={{ height: space.lg }} />
-          <Keypad onKey={(key) => draft.setAmount(applyKey(draft.amount, key))} />
+        </ScrollView>
 
+        {/*
+          Pinned action zone. The keypad and the primary action sit outside the
+          scroll view so neither can leave the viewport — on a short phone the
+          over-balance notice used to push "Review transfer" off screen, which is
+          exactly when the amount needs correcting.
+        */}
+        <View style={{ paddingTop: space.md }}>
+          <Keypad onKey={(key) => draft.setAmount(applyKey(draft.amount, key))} />
           <View style={{ paddingHorizontal: space.gutter, paddingTop: 6 }}>
             <Button
               label="Review transfer"
@@ -402,7 +414,8 @@ export default function SendComposeScreen() {
               onPress={proceed}
             />
           </View>
-        </ScrollView>
+        </View>
+        </>
       )}
 
       <PickerSheet
@@ -438,9 +451,12 @@ function ContactPicker({ onPick }: { onPick: (recipient: DraftRecipient) => void
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.gutter, gap: 10 }}>
-      {contacts.data.map((contact) => (
-        <Card key={contact.id} padded={false} style={{ paddingHorizontal: 14 }}>
+    <FlatList
+      data={contacts.data}
+      keyExtractor={(contact) => contact.id}
+      contentContainerStyle={{ padding: space.gutter, gap: 10 }}
+      renderItem={({ item: contact }) => (
+        <Card padded={false} style={{ paddingHorizontal: 14 }}>
           <ListRow
             onPress={() =>
               onPick({
@@ -453,7 +469,7 @@ function ContactPicker({ onPick }: { onPick: (recipient: DraftRecipient) => void
             leading={
               <Avatar
                 name={contact.displayName}
-                size={44}
+                size={AVATAR_SIZE}
                 country={contact.countryCode}
                 currency={contact.currency}
               />
@@ -463,8 +479,8 @@ function ContactPicker({ onPick }: { onPick: (recipient: DraftRecipient) => void
             trailing={<Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />}
           />
         </Card>
-      ))}
-    </ScrollView>
+      )}
+    />
   );
 }
 
@@ -482,57 +498,66 @@ function AddressPicker({
   const lookup = useAddressLookup(normalized);
 
   return (
-    <ScrollView
-      contentContainerStyle={{ padding: space.gutter, gap: space.lg }}
-      keyboardShouldPersistTaps="handled"
+    // The resolved-account card renders *below* the field, so without this the
+    // keyboard covers the confirmation the user is waiting for.
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <TextField
-        label="Wallet address"
-        value={value}
-        onChangeText={onChange}
-        placeholder="CW-XXXX-XXXX-XXXX-XXXX"
-        autoCapitalize="characters"
-        autoCorrect={false}
-        hint="Ask them to open Receive and share their address."
-      />
-
-      {lookup.isFetching && <Loading label="Looking up that address…" />}
-
-      {lookup.isError && (
-        <Notice
-          tone="error"
-          title="No account for that address"
-          body="Double-check the address — every CaribPay address looks like CW-XXXX-XXXX-XXXX-XXXX."
+      <ScrollView
+        contentContainerStyle={{ padding: space.gutter, gap: space.lg }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TextField
+          label="Wallet address"
+          value={value}
+          onChangeText={onChange}
+          placeholder="CW-XXXX-XXXX-XXXX-XXXX"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          hint="Ask them to open Receive and share their address."
         />
-      )}
 
-      {lookup.data !== undefined && (
-        <Card style={{ paddingHorizontal: 14 }}>
-          <ListRow
-            onPress={() =>
-              onPick({
-                address: lookup.data.walletAddress,
-                displayName: lookup.data.displayName,
-                countryCode: lookup.data.countryCode,
-                currency: lookup.data.currency,
-              })
-            }
-            leading={
-              <Avatar
-                name={lookup.data.displayName}
-                size={44}
-                country={lookup.data.countryCode}
-                currency={lookup.data.currency}
-              />
-            }
-            title={lookup.data.displayName}
-            subtitle={`${COUNTRY_NAMES[lookup.data.countryCode] ?? lookup.data.countryCode} · ${
-              CURRENCY_SYMBOLS[lookup.data.currency]
-            }`}
-            trailing={<Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />}
+        {lookup.isFetching && <Loading label="Looking up that address…" />}
+
+        {lookup.isError && (
+          <Notice
+            tone="error"
+            title="No account for that address"
+            body="Double-check the address — every CaribPay address looks like CW-XXXX-XXXX-XXXX-XXXX."
           />
-        </Card>
-      )}
-    </ScrollView>
+        )}
+
+        {lookup.data !== undefined && (
+          <Card style={{ paddingHorizontal: 14 }}>
+            <ListRow
+              onPress={() =>
+                onPick({
+                  address: lookup.data.walletAddress,
+                  displayName: lookup.data.displayName,
+                  countryCode: lookup.data.countryCode,
+                  currency: lookup.data.currency,
+                })
+              }
+              leading={
+                <Avatar
+                  name={lookup.data.displayName}
+                  size={AVATAR_SIZE}
+                  country={lookup.data.countryCode}
+                  currency={lookup.data.currency}
+                />
+              }
+              title={lookup.data.displayName}
+              subtitle={`${COUNTRY_NAMES[lookup.data.countryCode] ?? lookup.data.countryCode} · ${
+                CURRENCY_SYMBOLS[lookup.data.currency]
+              }`}
+              trailing={
+                <Icon name="chevronRight" size={18} color={color.inkSubtle} strokeWidth={2.2} />
+              }
+            />
+          </Card>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

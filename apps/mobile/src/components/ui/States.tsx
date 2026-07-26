@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { ActivityIndicator, Animated, Easing, View, type StyleProp, type ViewStyle } from "react-native";
 import { color, radius, space } from "@/theme";
 import { Icon, type IconName } from "@/components/Icon";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import { Button } from "./Button";
 import { Txt } from "./Txt";
 
@@ -169,8 +170,15 @@ export function Skeleton({
   style?: StyleProp<ViewStyle>;
 }) {
   const pulse = useRef(new Animated.Value(0.5)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    // Reduce Motion: hold a steady mid-opacity block. It still reads as
+    // "content is loading here" without the pulse.
+    if (reducedMotion) {
+      pulse.setValue(0.7);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -189,7 +197,7 @@ export function Skeleton({
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reducedMotion]);
 
   return (
     <Animated.View

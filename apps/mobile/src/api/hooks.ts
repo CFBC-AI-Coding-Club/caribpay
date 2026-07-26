@@ -31,7 +31,6 @@ import {
 } from "@caribpay/shared";
 import { apiRequest } from "./client";
 import { useAuthStore } from "@/stores/auth";
-import { randomId } from "@/lib/id";
 
 export const queryKeys = {
   me: ["me"] as const,
@@ -208,16 +207,23 @@ export interface CreateTransferInput {
   sourceAmountMinor: number;
   note?: string;
   quoteId?: string;
+  /**
+   * Supplied by the caller, not minted here: a key generated inside the mutation
+   * would be different on every retry, so a retry after a network failure would
+   * post a second transfer instead of replaying the first. It lives with the
+   * draft, which is what defines "the same transfer".
+   */
+  idempotencyKey: string;
 }
 
 export function useCreateTransfer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CreateTransferInput) => {
+    mutationFn: async ({ idempotencyKey, ...body }: CreateTransferInput) => {
       const { transaction } = await apiRequest("/transfers", {
         method: "POST",
-        body: input,
-        idempotencyKey: randomId(),
+        body,
+        idempotencyKey,
         schema: transferResponseSchema,
       });
       return transaction;
