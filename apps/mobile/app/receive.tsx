@@ -23,9 +23,9 @@ import { ApiRequestError } from "@/api/client";
 /**
  * Your address, large and copyable, with the signed QR beneath it.
  *
- * The address leads because it is the thing a person can say over a phone call —
- * which is the whole reason for moving off `CW-…` identifiers. The QR is the
- * same address, signed, for when the two phones are in the same room.
+ * The address leads because it is the thing a person can say over a phone call.
+ * The QR is the same address, signed, for when the two phones are in the same
+ * room.
  */
 export default function ReceiveScreen() {
   const router = useRouter();

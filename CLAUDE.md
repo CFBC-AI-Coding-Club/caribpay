@@ -187,7 +187,7 @@ The interface points **outward at banks** — that inversion is the architecture
 # Verification
 
 ```bash
-bun test                # 138 tests, incl. the switch↔bank integration suite
+bun test                # 145 tests, incl. the switch↔bank integration suite
 bun run reconcile       # per-currency zero, caps, stalled transfers, stranded holds
 bun run settle          # net member-bank positions to zero
 bun run typecheck       # four workspaces
@@ -197,7 +197,7 @@ bun run typecheck       # four workspaces
 
 # Local environment note
 
-**See [RUNNING.md](RUNNING.md) for the full machine-specific runbook.** The essentials:
+**See [docs/RUNNING.md](docs/RUNNING.md) for the full machine-specific runbook.** The essentials:
 
 Docker on this machine runs inside WSL2 Ubuntu (no Docker Desktop). The redis container maps to host port 6380 here (native WSL redis owns 6379).
 

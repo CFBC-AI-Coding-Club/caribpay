@@ -39,7 +39,7 @@ export function Card({
 }
 
 /**
- * The deep-gradient hero card — total balance, wallet balance, menu profile.
+ * The deep-gradient hero card — the account balance on Home, the menu profile.
  * The watermark is the logo mark bled off the top-right corner at low opacity.
  */
 export function GradientCard({

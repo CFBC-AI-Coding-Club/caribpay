@@ -69,7 +69,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
 
 /**
  * Representative country for a currency, for flag display when we only know the
- * currency (e.g. a wallet row). XCD spans eight territories — KN is the
+ * currency (e.g. an account row). XCD spans eight territories — KN is the
  * prototype's home market, so it stands in for the zone.
  */
 export const CURRENCY_TO_COUNTRY: Record<Currency, FlagCountry> = {

@@ -1,7 +1,39 @@
 node_modules/
+
+# Environment — never commit a real one; .env.example is the template.
 .env
-.env.*.local
-*.log
+.env.*
+!.env.example
+!*.env.example
+
+# Build output
 dist/
+build/
+web-build/
 .expo/
+*.tsbuildinfo
+
+# Test / coverage output
+coverage/
+*.lcov
+
+# Local database volumes, if bind-mounted instead of the named docker volumes
+pgdata/
+redisdata/
+docker/data/
+
+# Logs
+*.log
+logs/
+
+# Local tooling and editor state
+.claude/
+.impeccable/
+.ds-sync/
+.design-sync/
+apps/mobile/ds-types/
+.vscode/
+.idea/
+
 .DS_Store
+Thumbs.db

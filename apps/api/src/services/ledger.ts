@@ -7,8 +7,8 @@ export class LedgerValidationError extends Error {}
 export class UnbalancedLedgerError extends Error {}
 
 /**
- * A posting against a clearing account. There is only one kind now: with no
- * customer balances in this database, every entry is a system-account entry.
+ * A posting against a clearing account. There is only one kind: with no customer
+ * balances in this database, every entry is a system-account entry.
  */
 export interface LedgerEntryInput {
   systemAccountId: string;
@@ -21,9 +21,9 @@ export interface LedgerEntryInput {
  * Append a balanced set of entries for one transaction.
  *
  * Must be called inside the same DB transaction as the status change it belongs
- * to. There is no balance cache to keep in step any more — positions are always
- * derived from the entries, so the only thing this has to protect is the
- * invariant itself.
+ * to. Positions are always derived from the entries and never stored, so the
+ * only thing this has to protect is the invariant: per transaction per currency,
+ * sum(debits) = sum(credits).
  */
 export async function postLedgerEntries(
   dbh: DbHandle,

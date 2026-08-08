@@ -10,12 +10,6 @@ export const env = {
   refreshTokenTtlDays: intFromEnv(process.env.REFRESH_TOKEN_TTL_DAYS, 30),
   qrHmacSecret: process.env.QR_HMAC_SECRET ?? "dev-only-qr-secret-not-for-production",
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
-  /** Fixed settlement delay; null means the mock's realistic random 2-5 s. */
-  mockSettlementDelayMs:
-    process.env.MOCK_SETTLEMENT_DELAY_MS === undefined || process.env.MOCK_SETTLEMENT_DELAY_MS === ""
-      ? null
-      : intFromEnv(process.env.MOCK_SETTLEMENT_DELAY_MS, 3000),
-  mockSettlementFailures: process.env.MOCK_SETTLEMENT_FAILURES === "true",
   /** The mock member-bank service. The only route to customer accounts. */
   bankBaseUrl: process.env.BANK_BASE_URL ?? "http://localhost:3100",
   /**

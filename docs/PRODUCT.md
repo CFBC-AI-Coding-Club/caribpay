@@ -167,7 +167,7 @@ diverge, record the divergence rather than silently choosing one.
   users across St. Kitts, Jamaica, Barbados and Trinidad with memorable addresses, linked
   accounts, and verified phone keys. Documented in `DEMO.md`; the St. Kitts → Jamaica pair is
   the cross-currency demonstration.
-- **138 tests**, including a switch/bank integration suite that runs the real API against a
+- **145 tests**, including a switch/bank integration suite that runs the real API against a
   real mock bank over HTTP with two Postgres databases.
 
 **Absences future work must not fabricate:** there is no real bank connection, no relationship

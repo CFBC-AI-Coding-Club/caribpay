@@ -8,7 +8,7 @@
  * The app deliberately carries no in-app disclaimer — it was repeated on five
  * screens and read as a defect rather than a disclosure. The obligation moved to
  * the people presenting: say it out loud, and see the note at the top of
- * `DEMO.md`.
+ * `docs/DEMO.md`.
  *
  * Only `caribpay` is an active PSP — the only suffix a user can register a VPA
  * against. Every bank is `planned`, which is what makes the multi-PSP

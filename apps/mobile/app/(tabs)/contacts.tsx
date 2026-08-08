@@ -31,7 +31,6 @@ const QUICK_SEND_LIMIT = 8;
 /** Pinned contacts as tappable avatars — two taps to pay someone. */
 function QuickSend({ contacts }: { contacts: Contact[] }) {
   const router = useRouter();
-  const setRecipient = useDraftStore((s) => s.setRecipient);
   const reset = useDraftStore((s) => s.reset);
 
   function send(contact: Contact) {
@@ -109,7 +108,6 @@ function QuickSend({ contacts }: { contacts: Contact[] }) {
 export default function ContactsScreen() {
   const router = useRouter();
   const contacts = useContacts();
-  const setRecipient = useDraftStore((s) => s.setRecipient);
   const reset = useDraftStore((s) => s.reset);
   const [search, setSearch] = useState("");
 

@@ -251,7 +251,7 @@ export async function driveTransfer(dbh: DbHandle, transactionId: string): Promi
 
   const ctx = await loadSagaContext(dbh, row);
 
-  // ── Step 1 · reserve the funds at the payer's bank ────────────────────────
+  // Step 1 · reserve the funds at the payer's bank
   if (row.status === "initiated" || row.status === "debit_pending") {
     row = await setStatus(dbh, row.id, { status: "debit_pending" });
     try {
@@ -276,7 +276,7 @@ export async function driveTransfer(dbh: DbHandle, transactionId: string): Promi
     }
   }
 
-  // ── Step 2 · pay the payee's bank ─────────────────────────────────────────
+  // Step 2 · pay the payee's bank
   if (row.status === "debit_held" || (row.status === "credit_pending" && row.creditRef === null)) {
     row = await setStatus(dbh, row.id, { status: "credit_pending" });
     try {
@@ -304,7 +304,7 @@ export async function driveTransfer(dbh: DbHandle, transactionId: string): Promi
     }
   }
 
-  // ── Step 3 · draw the hold down and post the clearing entries ─────────────
+  // Step 3 · draw the hold down and post the clearing entries
   if (row.status === "credit_pending" && row.creditRef !== null) {
     const confirmed = await ctx.payerConnector.confirmDebit(
       row.holdRef!,
@@ -314,7 +314,7 @@ export async function driveTransfer(dbh: DbHandle, transactionId: string): Promi
     return;
   }
 
-  // ── Reversal · give the payer their money back ────────────────────────────
+  // Reversal · give the payer their money back
   if (row.status === "reversal_pending") {
     await ctx.payerConnector.releaseHold(row.holdRef!, bankStepKey(row.id, "release"));
     await finalizeReversed(dbh, row.id);

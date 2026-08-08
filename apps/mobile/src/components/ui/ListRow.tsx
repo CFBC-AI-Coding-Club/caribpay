@@ -5,14 +5,14 @@ import { Txt } from "./Txt";
 
 /**
  * A leading-visual / title+subtitle / trailing row. Every list in the app
- * (wallets, transactions, contacts, menu) is this shape, so keeping it in one
+ * (accounts, transactions, contacts, menu) is this shape, so keeping it in one
  * place is what makes those lists look like siblings.
  */
 export function ListRow({
   leading,
   title,
   subtitle,
-  /** Extra node beside the subtitle, e.g. the HOME wallet tag. */
+  /** Extra node beside the subtitle, e.g. the currency pill on a contact row. */
   subtitleAccessory,
   trailing,
   onPress,

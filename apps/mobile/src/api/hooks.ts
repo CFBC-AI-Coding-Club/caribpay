@@ -63,8 +63,6 @@ export const queryKeys = {
 
 const PAGE_SIZE = 20;
 
-// ── Accounts ────────────────────────────────────────────────────────────────
-
 export function useAccounts(): UseQueryResult<AccountsResponse> {
   return useQuery({
     queryKey: queryKeys.accounts,
@@ -116,8 +114,6 @@ export function useLinkAccount() {
     },
   });
 }
-
-// ── Directory ───────────────────────────────────────────────────────────────
 
 /** Confirm who you are about to pay, before any amount is entered. */
 export function useResolveKey(key: string, enabled: boolean): UseQueryResult<ResolveResponse> {
@@ -190,8 +186,6 @@ export function useReleaseKey() {
   });
 }
 
-// ── Transfers ───────────────────────────────────────────────────────────────
-
 export function useTransactions() {
   const query = useInfiniteQuery({
     queryKey: queryKeys.transactions,
@@ -258,8 +252,6 @@ export function useCreateTransfer() {
   });
 }
 
-// ── Notifications ───────────────────────────────────────────────────────────
-
 /**
  * Poll the unread count while the app is foregrounded.
  *
@@ -316,8 +308,6 @@ export function useArrivalWatcher(unread: number | undefined): void {
   }, [unread, queryClient]);
 }
 
-// ── Settlement ──────────────────────────────────────────────────────────────
-
 const positionsResponseSchema = z.object({
   positions: z.array(
     z.object({
@@ -338,8 +328,6 @@ export function usePositions() {
     queryFn: () => apiRequest("/settlement/positions", { schema: positionsResponseSchema }),
   });
 }
-
-// ── Contacts, QR, FX, auth ──────────────────────────────────────────────────
 
 export function useContacts(): UseQueryResult<Contact[]> {
   return useQuery({

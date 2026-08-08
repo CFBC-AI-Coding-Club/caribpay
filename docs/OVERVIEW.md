@@ -229,7 +229,7 @@ bun run dev:api               # the switch       :3000
 bun run dev:mobile            # Expo / Metro
 bun run settle                # net the positions
 bun run reconcile             # prove the books
-bun test                      # 138 tests
+bun test                      # 145 tests
 ```
 
 Machine-specific quirks (Docker in WSL2, redis on 6380, running `bun test` through WSL) are in

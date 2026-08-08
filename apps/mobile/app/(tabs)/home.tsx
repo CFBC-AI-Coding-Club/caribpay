@@ -97,11 +97,6 @@ function QuickActions() {
 }
 
 /**
- * The nocturne card, now carrying a balance held at a member bank rather than a
- * balance we hold. The figure is read live and stated as such: the switch has no
- * opinion about what someone has, it asks their bank.
- */
-/**
  * Net movement through this account over the last seven days.
  *
  * Computed from the feed, so it is only shown once the whole feed is loaded —
@@ -128,6 +123,11 @@ function useWeeklyDelta(account: LinkedAccount, items: Transaction[], complete: 
   }, [account.currency, items, complete]);
 }
 
+/**
+ * The nocturne card. The balance it carries is held at a member bank, not by us:
+ * it is read live and stated as such, because the switch has no opinion about
+ * what someone has — it asks their bank.
+ */
 function BalanceCard({
   account,
   items,

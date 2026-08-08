@@ -40,7 +40,6 @@ export default function RegisterScreen() {
   const [country, setCountry] = useState<SupportedCountry>("KN");
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const homeCurrency = homeCurrencyFor(country);
   const passwordTooShort = password !== "" && password.length < 8;
   const canSubmit =
     fullName.trim() !== "" &&

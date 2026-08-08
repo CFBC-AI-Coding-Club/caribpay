@@ -151,8 +151,6 @@ export const linkedAccounts = pgTable(
  * Uniqueness on `value_normalized` and `skeleton` is **global, not partial** —
  * released keys keep their names forever. In an instant, irreversible system a
  * recycled handle means money reaching a stranger, so a handle is spent once.
- * (This is a deliberate departure from the plan's partial-index sketch, which
- * would have permitted recycling.)
  *
  * `skeleton` is null for phone and email keys: confusable-collapsing is only
  * meaningful for a chosen handle, and Postgres treats nulls as distinct.
@@ -268,9 +266,8 @@ export const transactions = pgTable(
 /**
  * The clearing ledger. Append-only — a DB trigger rejects UPDATE and DELETE.
  *
- * Every entry is now a system-account entry: with no customer balances there is
- * no second kind of account, so the `user_wallet | system` discriminator, the
- * nullable `wallet_id`, and the two-branch check constraint are all gone.
+ * Every entry is a system-account entry. With no customer balances in this
+ * database there is no second kind of account, so there is no customer side.
  */
 export const ledgerEntries = pgTable(
   "ledger_entries",

@@ -11,7 +11,7 @@ import { Icon } from "@/components/Icon";
 import { Avatar, ListRow, StatusBadge, Txt } from "@/components/ui";
 import { recencyLabel } from "@/lib/datetime";
 
-/** Movements with no counterparty user — funding a wallet, or converting your own money. */
+/** Movements with no counterparty user — funding an account, or converting your own money. */
 function selfLabel(tx: Transaction): string {
   if (tx.type === "deposit") return "Wallet top-up";
   if (tx.type === "withdrawal") return "Withdrawal";

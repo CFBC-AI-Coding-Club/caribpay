@@ -111,11 +111,10 @@ export function FilterChips<T extends string>({
 /**
  * The real platform switch, brand-tinted.
  *
- * This was a hand-rolled pill until a platform audit: it carried no brand
- * expression the system colour couldn't, and it matched neither the iOS switch
- * (51×31, distinctive thumb) nor Material 3's (52×32, icon in the thumb) — so a
- * fluent user on either platform read it as an off-spec control for nothing.
- * `Switch` renders each platform's own, themed through its track colour.
+ * Deliberately the platform's own `Switch` rather than a hand-rolled pill: a
+ * custom one matches neither the iOS switch (51×31, distinctive thumb) nor
+ * Material 3's (52×32, icon in the thumb), so a fluent user on either platform
+ * reads it as an off-spec control for no gain. Themed via the track colour.
  */
 export function Toggle({
   value,
@@ -138,23 +137,3 @@ export function Toggle({
   );
 }
 
-/** Radio dot used by the Add wallet currency list. */
-export function RadioDot({ selected }: { selected: boolean }) {
-  return (
-    <View
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: selected ? color.primary : color.borderStrong,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {selected && (
-        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: color.interactive }} />
-      )}
-    </View>
-  );
-}
