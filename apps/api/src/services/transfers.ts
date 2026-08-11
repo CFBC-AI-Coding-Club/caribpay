@@ -168,7 +168,9 @@ export async function createTransfer(
         .from(transactions)
         .where(eq(transactions.idempotencyKey, idempotencyKey));
       if (existing !== undefined && existing.senderUserId === userId) {
-        await enqueueTransfer(existing.id);
+        if (!isTerminal(existing.status)) {
+          await enqueueTransfer(existing.id);
+        }
         const party = await resolveParty(dbh, userId, existing);
         return { transaction: toPublicTransaction(existing, party), replayed: true };
       }
