@@ -32,7 +32,6 @@ import {
   TEST_DATABASE_URL,
   bankBalance,
   createTestUser,
-  openBankClient,
   outstandingHoldCount,
   resetBank,
   seedWorld,
@@ -91,6 +90,11 @@ beforeAll(async () => {
   process.env.MOCK_BANK_LATENCY_MAX_MS = "0";
   process.env.MOCK_BANK_FAILURE_RATE = "0";
 
+  // The switch suite must initialize its own bank schema instead of depending
+  // on another test file running first.
+  const { setupTestBankDb } = await import("../apps/mock-bank/test/helpers");
+  bank = (await setupTestBankDb()).client;
+
   const { buildBankApp } = await import("../apps/mock-bank/src/app");
   bankServer = Bun.serve({ port: 0, fetch: buildBankApp().fetch });
 
@@ -106,7 +110,6 @@ beforeAll(async () => {
   ({ sweepStalledTransfers: sweepStalled } = await import("../apps/api/src/workers/recovery"));
   ({ runSettlementCycle } = await import("../apps/api/src/settlement/netting"));
   ({ reconcile, isClean } = await import("../apps/api/src/db/reconcile"));
-  bank = openBankClient();
 });
 
 afterAll(async () => {
