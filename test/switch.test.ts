@@ -307,6 +307,21 @@ describe("idempotency", () => {
     expect(rows).toHaveLength(1);
   });
 
+  test("a replay re-enqueues a transfer if its job is missing", async () => {
+    const { transferQueue } = await import("../apps/api/src/lib/queue");
+    const key = `retry-missed-queue-${crypto.randomUUID()}`;
+    const first = await send({ key });
+
+    await transferQueue.obliterate({ force: true });
+
+    const replay = await send({ key });
+    expect(replay.res.headers.get("Idempotency-Replayed")).toBe("true");
+    expect(replay.id).toBe(first.id);
+
+    const jobs = await transferQueue.getJobs(["waiting", "delayed", "prioritized"]);
+    expect(jobs.some((job) => job.data.transactionId === first.id)).toBe(true);
+  });
+
   test("re-driving a completed transfer does not move money twice", async () => {
     const { id } = await send();
     await driveTransfer(t.db, id);
