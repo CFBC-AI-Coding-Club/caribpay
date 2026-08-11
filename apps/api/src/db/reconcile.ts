@@ -13,6 +13,7 @@ export interface ReconcileResult {
   stalledTransfers: Array<{ id: string; status: string; deadlineAt: string | null }>;
   /** Funds still reserved at a bank with nothing driving them. */
   strandedHolds: Array<{ holdRef: string; accountRef: string; reference: string }>;
+  bankCheck: "ok" | "unavailable" | "skipped";
   positions: BankPosition[];
   fxBook: Array<{ currency: Currency; positionMinor: number }>;
 }
@@ -74,8 +75,11 @@ export async function reconcile(
     );
 
   let strandedHolds: ReconcileResult["strandedHolds"] = [];
+  let bankCheck: ReconcileResult["bankCheck"] = "skipped";
   if (options.checkBanks !== false) {
-    strandedHolds = await findStrandedHolds(dbh);
+    const bankResult = await findStrandedHolds(dbh);
+    strandedHolds = bankResult.strandedHolds;
+    bankCheck = bankResult.bankCheck;
   }
 
   return {
@@ -87,6 +91,7 @@ export async function reconcile(
       deadlineAt: s.deadlineAt === null ? null : s.deadlineAt.toISOString(),
     })),
     strandedHolds,
+    bankCheck,
     positions,
     fxBook: await fxBookPositions(dbh),
   };
@@ -97,17 +102,18 @@ export async function reconcile(
  * never existed. Asked of the bank, not of ourselves: a hold we have forgotten
  * about is precisely the one our own tables cannot show us.
  */
-async function findStrandedHolds(dbh: DbHandle): Promise<ReconcileResult["strandedHolds"]> {
+async function findStrandedHolds(dbh: DbHandle): Promise<{
+  strandedHolds: ReconcileResult["strandedHolds"];
+  bankCheck: ReconcileResult["bankCheck"];
+}> {
   const { HttpBankConnector } = await import("../banks/http-connector");
   let holds;
   try {
     holds = await new HttpBankConnector().listOutstandingHolds();
   } catch {
-    // The bank being unreachable is not a reconciliation failure; it is a
-    // reconciliation we could not complete, and the caller is told so.
-    return [];
+    return { strandedHolds: [], bankCheck: "unavailable" };
   }
-  if (holds.length === 0) return [];
+  if (holds.length === 0) return { strandedHolds: [], bankCheck: "ok" };
 
   const rows = await dbh
     .select({ id: transactions.id, status: transactions.status })
@@ -115,17 +121,19 @@ async function findStrandedHolds(dbh: DbHandle): Promise<ReconcileResult["strand
     .where(inArray(transactions.id, holds.map((h) => h.reference)));
   const statusById = new Map(rows.map((r) => [r.id, r.status]));
 
-  return holds
+  return {
+    bankCheck: "ok",
+    strandedHolds: holds
     .filter((hold) => {
       const status = statusById.get(hold.reference);
-      // A hold is legitimate only while its transfer is still mid-saga.
       return status === undefined || status === "completed" || status === "failed" || status === "reversed";
     })
     .map((hold) => ({
       holdRef: hold.holdRef,
       accountRef: hold.accountRef,
       reference: hold.reference,
-    }));
+    })),
+  };
 }
 
 export function isClean(result: ReconcileResult): boolean {
@@ -133,7 +141,8 @@ export function isClean(result: ReconcileResult): boolean {
     result.currencyImbalances.length === 0 &&
     result.capBreaches.length === 0 &&
     result.stalledTransfers.length === 0 &&
-    result.strandedHolds.length === 0
+    result.strandedHolds.length === 0 &&
+    result.bankCheck === "ok"
   );
 }
 
@@ -182,6 +191,12 @@ if (import.meta.main) {
   }
   for (const h of result.strandedHolds) {
     console.error(`  stranded hold ${h.holdRef} on ${h.accountRef} (transfer ${h.reference})`);
+  }
+  if (result.bankCheck === "unavailable") {
+    console.error("  bank hold check failed: could not reach bank service");
+  }
+  if (result.bankCheck === "skipped") {
+    console.error("  bank hold check skipped");
   }
   process.exit(1);
 }
