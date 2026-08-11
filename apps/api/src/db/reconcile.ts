@@ -124,15 +124,20 @@ async function findStrandedHolds(dbh: DbHandle): Promise<{
   return {
     bankCheck: "ok",
     strandedHolds: holds
-    .filter((hold) => {
-      const status = statusById.get(hold.reference);
-      return status === undefined || status === "completed" || status === "failed" || status === "reversed";
-    })
-    .map((hold) => ({
-      holdRef: hold.holdRef,
-      accountRef: hold.accountRef,
-      reference: hold.reference,
-    })),
+      .filter((hold) => {
+        const status = statusById.get(hold.reference);
+        return (
+          status === undefined ||
+          status === "completed" ||
+          status === "failed" ||
+          status === "reversed"
+        );
+      })
+      .map((hold) => ({
+        holdRef: hold.holdRef,
+        accountRef: hold.accountRef,
+        reference: hold.reference,
+      })),
   };
 }
 
@@ -193,7 +198,7 @@ if (import.meta.main) {
     console.error(`  stranded hold ${h.holdRef} on ${h.accountRef} (transfer ${h.reference})`);
   }
   if (result.bankCheck === "unavailable") {
-    console.error("  bank hold check failed: could not reach bank service");
+    console.error("  bank hold check failed");
   }
   if (result.bankCheck === "skipped") {
     console.error("  bank hold check skipped");
