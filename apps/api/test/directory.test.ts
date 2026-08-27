@@ -236,6 +236,84 @@ describe("resolving", () => {
     expect(await errorCode(res)).toBe("OWN_KEY");
   });
 
+  test("rejects unverified email and phone keys", async () => {
+    const devonTok = await token("devon@test.local");
+    const amaraTok = await token("amara@test.local");
+    const cases = [
+      {
+        type: "email",
+        claimedValue: "devon.pay@example.com",
+        lookupValue: "devon.pay@example.com",
+      },
+      {
+        type: "phone",
+        claimedValue: "+1 (869) 765-4321",
+        lookupValue: "+1 869 765 4321",
+      },
+    ];
+
+    for (const keyCase of cases) {
+      const claimed = await api("/api/v1/directory/keys", {
+        token: devonTok,
+        method: "POST",
+        body: JSON.stringify({ type: keyCase.type, value: keyCase.claimedValue }),
+      });
+      expect(claimed.status).toBe(201);
+
+      const resolved = await api(
+        `/api/v1/directory/resolve?key=${encodeURIComponent(keyCase.lookupValue)}`,
+        { token: amaraTok },
+      );
+      expect(resolved.status).toBe(404);
+      expect(await errorCode(resolved)).toBe("KEY_NOT_FOUND");
+    }
+  });
+
+  test("resolves verified email and phone keys", async () => {
+    const devonTok = await token("devon@test.local");
+    const amaraTok = await token("amara@test.local");
+    const cases = [
+      {
+        type: "email",
+        claimedValue: "devon.verified@example.com",
+        lookupValue: "devon.verified@example.com",
+        normalizedValue: "devon.verified@example.com",
+      },
+      {
+        type: "phone",
+        claimedValue: "+1 (869) 765-4322",
+        lookupValue: "+1 869 765 4322",
+        normalizedValue: "+18697654322",
+      },
+    ];
+
+    for (const keyCase of cases) {
+      const claimed = await api("/api/v1/directory/keys", {
+        token: devonTok,
+        method: "POST",
+        body: JSON.stringify({ type: keyCase.type, value: keyCase.claimedValue }),
+      });
+      expect(claimed.status).toBe(201);
+      const { key } = (await claimed.json()) as { key: { id: string } };
+
+      const verified = await api(`/api/v1/directory/keys/${key.id}/verify`, {
+        token: devonTok,
+        method: "POST",
+        body: JSON.stringify({ code: "000000" }),
+      });
+      expect(verified.status).toBe(200);
+
+      const resolved = await api(
+        `/api/v1/directory/resolve?key=${encodeURIComponent(keyCase.lookupValue)}`,
+        { token: amaraTok },
+      );
+      expect(resolved.status).toBe(200);
+      const body = (await resolved.json()) as Record<string, unknown>;
+      expect(body.key).toBe(keyCase.normalizedValue);
+      expect(body.payable).toBe(true);
+    }
+  });
+
   test("reports an unpayable address rather than failing the lookup", async () => {
     // The payer should learn who this is and why they cannot be paid. Failing
     // the request would show a generic error about a person who exists.

@@ -21,13 +21,17 @@ import type { Hono } from "hono";
 import type { SQL } from "bun";
 import { bankStepKey } from "@caribpay/shared";
 import type { AppEnv } from "../apps/api/src/app-env";
-import { ledgerEntries, notifications, transactions } from "../apps/api/src/db/schema";
+import {
+  idempotencyRecords,
+  ledgerEntries,
+  notifications,
+  transactions,
+} from "../apps/api/src/db/schema";
 import {
   TEST_BANK_DATABASE_URL,
   TEST_DATABASE_URL,
   bankBalance,
   createTestUser,
-  openBankClient,
   outstandingHoldCount,
   resetBank,
   seedWorld,
@@ -86,6 +90,11 @@ beforeAll(async () => {
   process.env.MOCK_BANK_LATENCY_MAX_MS = "0";
   process.env.MOCK_BANK_FAILURE_RATE = "0";
 
+  // The switch suite must initialize its own bank schema instead of depending
+  // on another test file running first.
+  const { setupTestBankDb } = await import("../apps/mock-bank/test/helpers");
+  bank = (await setupTestBankDb()).client;
+
   const { buildBankApp } = await import("../apps/mock-bank/src/app");
   bankServer = Bun.serve({ port: 0, fetch: buildBankApp().fetch });
 
@@ -101,7 +110,6 @@ beforeAll(async () => {
   ({ sweepStalledTransfers: sweepStalled } = await import("../apps/api/src/workers/recovery"));
   ({ runSettlementCycle } = await import("../apps/api/src/settlement/netting"));
   ({ reconcile, isClean } = await import("../apps/api/src/db/reconcile"));
-  bank = openBankClient();
 });
 
 afterAll(async () => {
@@ -305,6 +313,45 @@ describe("idempotency", () => {
 
     const rows = await t.db.select().from(transactions).where(eq(transactions.type, "p2p_transfer"));
     expect(rows).toHaveLength(1);
+  });
+
+  test("a replay re-enqueues a transfer if its job is missing", async () => {
+    const { transferQueue } = await import("../apps/api/src/lib/queue");
+    const key = `retry-missed-queue-${crypto.randomUUID()}`;
+    const first = await send({ key });
+
+    const originalJob = await transferQueue.getJob(first.id);
+    expect(originalJob).toBeDefined();
+    await originalJob!.remove();
+    await t.db.delete(idempotencyRecords).where(eq(idempotencyRecords.key, key));
+
+    const replay = await send({ key });
+    expect(replay.res.status).toBe(200);
+    expect(replay.id).toBe(first.id);
+
+    const retriedJob = await transferQueue.getJob(first.id);
+    expect(retriedJob?.data.transactionId).toBe(first.id);
+  });
+
+  test("an ambiguous enqueue retry reuses the existing transfer job", async () => {
+    const { transferQueue } = await import("../apps/api/src/lib/queue");
+    const key = `retry-existing-queue-${crypto.randomUUID()}`;
+    const first = await send({ key });
+    await t.db.delete(idempotencyRecords).where(eq(idempotencyRecords.key, key));
+
+    const replay = await send({ key });
+    expect(replay.res.status).toBe(200);
+    expect(replay.id).toBe(first.id);
+
+    const jobs = await transferQueue.getJobs([
+      "waiting",
+      "delayed",
+      "prioritized",
+      "active",
+      "completed",
+      "failed",
+    ]);
+    expect(jobs.filter((job) => job.id === first.id)).toHaveLength(1);
   });
 
   test("re-driving a completed transfer does not move money twice", async () => {

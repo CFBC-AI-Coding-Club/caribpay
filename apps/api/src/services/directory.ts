@@ -1,4 +1,4 @@
-import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import {
   MAX_ACTIVE_DIRECTORY_KEYS,
   buildReservedSkeletons,
@@ -347,7 +347,11 @@ export async function resolveKey(
     .from(directoryKeys)
     .innerJoin(users, eq(users.id, directoryKeys.userId))
     .where(
-      and(eq(directoryKeys.valueNormalized, parsed.value), isNull(directoryKeys.releasedAt)),
+      and(
+        eq(directoryKeys.valueNormalized, parsed.value),
+        isNull(directoryKeys.releasedAt),
+        or(eq(directoryKeys.type, "vpa"), isNotNull(directoryKeys.verifiedAt)),
+      ),
     );
   if (row === undefined) {
     throw new ApiError(404, "KEY_NOT_FOUND", "Nobody is using that address");

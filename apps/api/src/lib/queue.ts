@@ -33,7 +33,7 @@ export async function enqueueTransfer(transactionId: string): Promise<void> {
   await transferQueue.add(
     "drive",
     { transactionId },
-    { attempts: 8, backoff: { type: "exponential", delay: 500 } },
+    { jobId: transactionId, attempts: 8, backoff: { type: "exponential", delay: 500 } },
   );
 }
 
