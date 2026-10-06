@@ -4,6 +4,14 @@ CaribPay is a **payment switch for the Caribbean** — the messaging and clearin
 
 This repository is a Phase 2 prototype built for the **CANTO Innovation Challenge 2026**.
 
+## Current project status
+
+Work on this prototype is active. If you are picking this up again, start with:
+
+1. Open issues and pull requests for current priorities.
+2. `docs/RUNNING.md` to get the local environment running quickly.
+3. The demo flow in [docs/DEMO.md](docs/DEMO.md) to verify end-to-end money movement.
+
 > **Every bank named in this project is simulated.** We have no relationship with St. Kitts-Nevis-Anguilla National Bank, NCB Jamaica, Republic Bank, Scotiabank, CIBC, or any other institution in the list. Nothing here connects to a real bank, and no real money moves.
 
 ---
